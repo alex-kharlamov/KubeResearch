@@ -1,0 +1,17 @@
+apiVersion: v2
+name: KubeResearch
+description: A Helm chart for Kubernetes
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+dependencies:
+  - name: gpu-operator
+    version: 23.9.1
+    repository: https://nvidia.github.io/gpu-operator
+  - name: volcano
+    version: 1.8.1
+    repository: https://volcano-sh.github.io/helm-charts
+  - name: kube-prometheus-stack
+    version: 55.5.0
+    repository: https://prometheus-community.github.io/helm-charts
