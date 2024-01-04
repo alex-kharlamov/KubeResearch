@@ -1,0 +1,12 @@
+dependencies:
+- name: gpu-operator
+  repository: https://nvidia.github.io/gpu-operator
+  version: v23.9.1
+- name: volcano
+  repository: https://volcano-sh.github.io/helm-charts
+  version: 1.8.1
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 55.5.0
+digest: sha256:e1fcf22fdb2ae44e24751c672e52950f0801c315a14bda94b499b4c4e1369105
+generated: "2024-01-04T22:58:10.565518455Z"
