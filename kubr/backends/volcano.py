@@ -24,12 +24,13 @@ from tabulate import tabulate
 RESERVED_MILLICPU = 100
 RESERVED_MEMMB = 1024
 
+ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
 
 @dataclass
 class PodResource:
-    cpu: float = 0
-    memMB: float = 0
-    gpu: float = 0
+    cpu: int = 0
+    memMB: int = 0
+    gpu: int = 0
     devices: Dict[str, float] = field(default_factory=dict)
     capabilities: Dict[str, str] = field(default_factory=dict)
 
@@ -70,8 +71,8 @@ def create_pod_definition(pod_name: str, pod_config: PodConfig, service_account:
     )
 
     node_selector: Dict[str, str] = {}
-    if LABEL_INSTANCE_TYPE in resource.capabilities:
-        node_selector[LABEL_INSTANCE_TYPE] = resource.capabilities[LABEL_INSTANCE_TYPE]
+    # if LABEL_INSTANCE_TYPE in resource.capabilities:
+    #     node_selector[LABEL_INSTANCE_TYPE] = resource.capabilities[LABEL_INSTANCE_TYPE]
 
     # To support PyTorch dataloaders we need to set /dev/shm to larger than the
     # 64M default so we mount an unlimited sized tmpfs directory on it.
@@ -173,12 +174,12 @@ class VolcanoBackend(BaseBackend):
         self.kubernetes_config = config.load_config()
         self.crd_client = client.CustomObjectsApi()
 
-    def run_job(self, job_name: str, namespace: str, image: str, command: str):
+    def run_job(self, job_name: str, namespace: str, image: str, entrypoint: str):
         unique_app_id = job_name
         queue = "default"
         job_retries = 0
         priority_class = None
-        task_name = "main_task"
+        task_name = "main-task"
         task_max_retries = 0
         replica_id = 0
         min_replicas = 1
@@ -189,9 +190,10 @@ class VolcanoBackend(BaseBackend):
                 resource=PodResource(
                     cpu=1,
                     memMB=1024,
+                    # gpu=1,
                 ),
                 image=image,
-                entrypoint=command,
+                entrypoint=entrypoint,
                 args=[],
             ),
             service_account=None,

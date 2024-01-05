@@ -1,5 +1,7 @@
 import argparse
 from kubr.ls.operator import LSOperator
+from kubr.run.operator import RUNOperator
+
 
 def main():
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
@@ -7,6 +9,15 @@ def main():
     subparsers = arg.add_subparsers(help='Commands', dest='command')
 
     submit_parser = subparsers.add_parser('run', help='Submit a new job')
+    submit_parser.add_argument('name',  help='Name of job to submit', type=str)
+    submit_parser.add_argument('-i', '--image', help='Image to run')
+    submit_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
+    # submit_parser.add_argument('-a', '--args', help='Arguments to pass to command')
+    # submit_parser.add_argument('-e', '--env', help='Environment variables to pass to command')
+    # submit_parser.add_argument('-r', '--resources', help='Resources to request')
+    # submit_parser.add_argument('-l', '--labels', help='Labels to add to job')
+    submit_parser.add_argument('-n', '--namespace', help='Namespace to submit job to', default='default')
+
 
     ls_parser = subparsers.add_parser('ls', help='List all jobs')
     ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
@@ -31,7 +42,10 @@ def main():
     args = arg.parse_args()
 
     if args.command == 'run':
-        pass
+        print(f'Running job {args.name} with image {args.image} and command {args.command}')
+        operator = RUNOperator()
+        print(operator(job_name=args.name, image=args.image,
+                       entrypoint=args.entrypoint, namespace=args.namespace))
     elif args.command == 'ls':
         operator = LSOperator()
         print(operator(namespace=args.namespace, show_all=args.all, head=args.top))
@@ -43,8 +57,8 @@ def main():
         pass
     elif args.command == 'attach':
         pass
-    else:
-        arg.print_help()
+    # else:
+    #     arg.print_help()
 
 
 if __name__ == '__main__':
