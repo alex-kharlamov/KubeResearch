@@ -1,5 +1,6 @@
 import argparse
 from kubr.ls.operator import LSOperator
+from kubr.rm.operator import RMOperator
 from kubr.run.operator import RUNOperator
 
 
@@ -26,7 +27,7 @@ def main():
 
     rm_parser = subparsers.add_parser('rm', help='Delete a job')
     rm_parser.add_argument('job', help='Name of job to delete')
-    rm_parser.add_argument('-n', '--namespace', help='Namespace to delete job from', default='All')
+    rm_parser.add_argument('-n', '--namespace', help='Namespace to delete job from', default='default')
 
     desc_parser = subparsers.add_parser('desc', help='Get info about a job')
     desc_parser.add_argument('job', help='Name of job to get info about')
@@ -50,7 +51,8 @@ def main():
         operator = LSOperator()
         print(operator(namespace=args.namespace, show_all=args.all, head=args.top))
     elif args.command == 'rm':
-        pass
+        operator = RMOperator()
+        print(operator(job_name=args.job, namespace=args.namespace))
     elif args.command == 'desc':
         pass
     elif args.command == 'logs':
