@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Literal, Dict, Any, Mapping, Iterable, List, Optional
 
 from kubr.backends.base import BaseBackend
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1Container,
     V1ContainerPort,
@@ -25,6 +25,7 @@ RESERVED_MILLICPU = 100
 RESERVED_MEMMB = 1024
 
 ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
+
 
 @dataclass
 class PodResource:
@@ -173,6 +174,7 @@ class VolcanoBackend(BaseBackend):
     def __init__(self):
         self.kubernetes_config = config.load_config()
         self.crd_client = client.CustomObjectsApi()
+        self.core_client = client.CoreV1Api()
 
     def run_job(self, job_name: str, namespace: str, image: str, entrypoint: str):
         unique_app_id = job_name
@@ -296,3 +298,31 @@ class VolcanoBackend(BaseBackend):
                                                                plural='jobs',
                                                                name=job_name)
         print(resp)
+
+    def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None):
+        pods = self.core_client.list_namespaced_pod(namespace=namespace,
+                                                    label_selector=f"volcano.sh/job-name={job_name}")
+        # TODO add logic for multi pod master-worker selection for logging extraction
+        if len(pods.items) == 0:
+            return f'No pods found for job {job_name} in namespace {namespace}'
+        pod = pods.items[0]
+        pod_name = pod.metadata.name
+        containers = pod.spec.containers
+        if len(containers) == 0:
+            return f'No containers found for pod {pod_name} in namespace {namespace}'
+        # TODO add logic for multi container selection for logging extraction
+        container = containers[0]
+        container_name = container.name
+        if tail:
+            api_response = self.core_client.read_namespaced_pod_log(name=pod_name, namespace=namespace,
+                                                                    container=container_name, tail_lines=tail)
+            return api_response
+        else:
+            w = watch.Watch()
+            # TODO fix log streaming utf-8 decoding
+            for line in w.stream(self.core_client.read_namespaced_pod_log, name=pod_name,
+                                 namespace=namespace, container=container_name):
+                print(line)
+
+        api_response = self.core_client.read_namespaced_pod_log(name=pod_name, namespace=namespace)
+        return api_response

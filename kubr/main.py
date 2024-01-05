@@ -1,4 +1,7 @@
-import argparse
+# PYTHON_ARGCOMPLETE_OK
+import argcomplete, argparse
+
+from kubr.logs.operator import LOGSOperator
 from kubr.ls.operator import LSOperator
 from kubr.rm.operator import RMOperator
 from kubr.run.operator import RUNOperator
@@ -19,7 +22,6 @@ def main():
     # submit_parser.add_argument('-l', '--labels', help='Labels to add to job')
     submit_parser.add_argument('-n', '--namespace', help='Namespace to submit job to', default='default')
 
-
     ls_parser = subparsers.add_parser('ls', help='List all jobs')
     ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
     ls_parser.add_argument('-a', '--all', help='Show all jobs', action='store_true', default=False)
@@ -34,12 +36,15 @@ def main():
 
     logs_parser = subparsers.add_parser('logs', help='Get logs of a job')
     logs_parser.add_argument('job', help='Name of job to get logs of')
+    logs_parser.add_argument('-n', '--namespace', help='Namespace to get logs from', default='default')
+    logs_parser.add_argument('-t', '--tail', help='Number of lines to show', default=10, type=int)
 
     attach_parser = subparsers.add_parser('attach', help='Attach to a job')
     attach_parser.add_argument('job', help='Name of job to attach to')
 
     stat_parser = subparsers.add_parser('stat', help='Get stats of a cluster')
 
+    argcomplete.autocomplete(arg)
     args = arg.parse_args()
 
     if args.command == 'run':
@@ -54,13 +59,16 @@ def main():
         operator = RMOperator()
         print(operator(job_name=args.job, namespace=args.namespace))
     elif args.command == 'desc':
-        pass
+        raise NotImplementedError  # TODO implement desc command
     elif args.command == 'logs':
-        pass
+        operator = LOGSOperator()
+        print(operator(job_name=args.job, namespace=args.namespace, tail=args.tail))
     elif args.command == 'attach':
-        pass
-    # else:
-    #     arg.print_help()
+        raise NotImplementedError   # TODO implement attach command
+    elif args.command == 'stat':
+        raise NotImplementedError  # TODO implement stat command
+    else:
+        arg.print_help()
 
 
 if __name__ == '__main__':

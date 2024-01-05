@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kubr"
+dynamic = ["version"]
+authors = [{ name = "Alex Kharlamov", email = "alex@kharlamov.dev" }]
+description = "Kubr is a tool for running experiments on Kubernetes clusters."
+license = { text = "MIT" }
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.8,<3.13"
+dependencies = [
+    # Please maintain an alphabetical order in the following list
+    "argcomplete==3.2.1",
+    "kubernetes==28.1.0",
+    "tabulate==0.8.9"
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/alex-kharlamov/KubeResearch"
+
+[project.scripts]
+kubr = "kubr.main:main"
+
+[tool.setuptools_scm]
+write_to = "kubr/_version.py"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["kubr"]
+exclude = ["charts", "venv", ]
+

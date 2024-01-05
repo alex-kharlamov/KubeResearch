@@ -1,3 +1,4 @@
 kubernetes==28.1.0
 tabulate==0.8.9
-prometheus-api-client==0.5.4
+argcomplete==3.2.1
+# prometheus-api-client==0.5.4
