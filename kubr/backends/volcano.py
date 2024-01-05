@@ -21,6 +21,8 @@ from kubernetes.client.models import (  # noqa: F811 redefinition of unused
 )
 from tabulate import tabulate
 
+from kubr.backends.utils import join_tables_horizontally
+
 RESERVED_MILLICPU = 100
 RESERVED_MEMMB = 1024
 
@@ -261,6 +263,7 @@ class VolcanoBackend(BaseBackend):
                                                                plural='jobs')
         jobs = jobs_stat['items']
         result_running_data = []
+        result_pending_data = []
         result_all_data = []
         for job in jobs:
             job_state = {'Name': job['metadata']['name'],
@@ -273,14 +276,24 @@ class VolcanoBackend(BaseBackend):
 
             if job_state['State'] == 'Running':
                 result_running_data.append(job_state)
+            elif job_state['State'] == 'Pending':
+                result_pending_data.append(job_state)
             else:
                 result_all_data.append(job_state)
 
         result_running_data.sort(key=lambda x: x['State Time'], reverse=True)
         if head:
             result_running_data = result_running_data[:head]
+
+        result_pending_data.sort(key=lambda x: x['State Time'], reverse=True)
+        if head:
+            result_pending_data = result_pending_data[:head]
+
         # TODO pretty handling of empty list in running jobs
-        result = tabulate(result_running_data, headers='keys', tablefmt='grid')
+        running_table = tabulate(result_running_data, headers='keys', tablefmt='grid')
+        pending_table = tabulate(result_pending_data, headers='keys', tablefmt='grid')
+
+        result = join_tables_horizontally(running_table, pending_table)
         if show_all:
             result_all_data.sort(key=lambda x: x['State Time'], reverse=True)
             if head:
