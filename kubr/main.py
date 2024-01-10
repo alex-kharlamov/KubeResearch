@@ -67,6 +67,8 @@ def main():
         raise NotImplementedError   # TODO implement attach command
     elif args.command == 'stat':
         raise NotImplementedError  # TODO implement stat command
+    elif args.command == 'test':
+        raise NotImplementedError  # TODO implement test command -- run IB\scheduler\metrics\registry\ethernet tests
     else:
         arg.print_help()
 

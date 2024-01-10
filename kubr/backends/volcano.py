@@ -1,6 +1,10 @@
+import time
+from collections import defaultdict
 from dataclasses import field, dataclass
 from enum import Enum
 from typing import Literal, Dict, Any, Mapping, Iterable, List, Optional
+from datetime import datetime
+import humanize
 
 from kubr.backends.base import BaseBackend
 from kubernetes import client, config, watch
@@ -258,49 +262,53 @@ class VolcanoBackend(BaseBackend):
         print(resp)
 
     def list_jobs(self, namespace: str = 'All', show_all: bool = False, head: int = None):
+        # TODO [ls] show used resources
+        # TODO [ls] speedup for selected namespace(filter on server side)
+        # TODO [ls] show events for pending jobs
         jobs_stat = self.crd_client.list_cluster_custom_object(group='batch.volcano.sh',
                                                                version='v1alpha1',
                                                                plural='jobs')
         jobs = jobs_stat['items']
-        result_running_data = []
-        result_pending_data = []
-        result_all_data = []
+
+        extracted_jobs = defaultdict(list)
         for job in jobs:
+            # TODO convert server time to local to fix humanize.naturaldelta timezone handling
             job_state = {'Name': job['metadata']['name'],
                          'Namespace': job['metadata']['namespace'],
                          'State': job['status']['state']['phase'],
-                         'State Time': job['status']['state']['lastTransitionTime']
+                         'Age': datetime.strptime(job['status']['state']['lastTransitionTime'],
+                                                                   '%Y-%m-%dT%H:%M:%SZ')
                          }
             if namespace != 'All' and job_state['Namespace'] != namespace:
                 continue
 
-            if job_state['State'] == 'Running':
-                result_running_data.append(job_state)
-            elif job_state['State'] == 'Pending':
-                result_pending_data.append(job_state)
+            if job_state['State'] in ['Pending', 'Running', 'Failed', 'Completed']:
+                extracted_jobs[job_state['State']].append(job_state)
             else:
-                result_all_data.append(job_state)
+                extracted_jobs['extra'].append(job_state)
 
-        result_running_data.sort(key=lambda x: x['State Time'], reverse=True)
-        if head:
-            result_running_data = result_running_data[:head]
+        for state in ['Pending', 'Running', 'Completed', 'Failed', 'extra']:
+            extracted_jobs[state].sort(key=lambda x: x['Age'], reverse=True)
+            for job in extracted_jobs[state]:
+                job['Age'] = humanize.naturaldelta(datetime.utcnow() - job['Age'])
+            if head:
+                extracted_jobs[state] = extracted_jobs[state][:head]
 
-        result_pending_data.sort(key=lambda x: x['State Time'], reverse=True)
-        if head:
-            result_pending_data = result_pending_data[:head]
+            # TODO [ls] add pretty formatting that will show only first 10 jobs in completed and failed states are shown
+            if not show_all and state in ['Completed', 'Failed']:
+                extracted_jobs[state] = extracted_jobs[state][:5]
+
+            extracted_jobs[state] = tabulate(extracted_jobs[state], headers='keys', tablefmt='grid')
 
         # TODO pretty handling of empty list in running jobs
-        running_table = tabulate(result_running_data, headers='keys', tablefmt='grid')
-        pending_table = tabulate(result_pending_data, headers='keys', tablefmt='grid')
+        result = join_tables_horizontally(extracted_jobs['Running'], extracted_jobs['Pending'])
+        result += '\n\n'
+        result += join_tables_horizontally(extracted_jobs['Completed'], extracted_jobs['Failed'])
 
-        result = join_tables_horizontally(running_table, pending_table)
         if show_all:
-            result_all_data.sort(key=lambda x: x['State Time'], reverse=True)
-            if head:
-                result_all_data = result_all_data[:head]
             result += '\n\n'
             # TODO pretty handling of empty list in all jobs
-            result += tabulate(result_all_data, headers='keys', tablefmt='grid')
+            result += extracted_jobs['extra']
 
         return result
 
