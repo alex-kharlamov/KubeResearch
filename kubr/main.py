@@ -1,6 +1,7 @@
 # PYTHON_ARGCOMPLETE_OK
 import argcomplete, argparse
 
+from kubr.desc.operator import DESCOperator
 from kubr.logs.operator import LOGSOperator
 from kubr.ls.operator import LSOperator
 from kubr.rm.operator import RMOperator
@@ -14,13 +15,14 @@ def main():
 
     run_parser = subparsers.add_parser('run', help='Submit a new job')
     run_parser.add_argument('config',  help='Path to run config', type=str)
-    # run_parser.add_argument('-i', '--image', help='Image to run')
-    # run_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
+    run_parser.add_argument('-i', '--image', help='Image to run')
+    run_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
+    run_parser.add_argument('-n', '--namespace', help='Namespace to submit job to')
+    run_parser.add_argument('--name', help='Name of job')
     # run_parser.add_argument('-a', '--args', help='Arguments to pass to command')
     # run_parser.add_argument('-e', '--env', help='Environment variables to pass to command')
     # run_parser.add_argument('-r', '--resources', help='Resources to request')
     # run_parser.add_argument('-l', '--labels', help='Labels to add to job')
-    # run_parser.add_argument('-n', '--namespace', help='Namespace to submit job to', default='default')
 
     ls_parser = subparsers.add_parser('ls', help='List all jobs')
     ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
@@ -32,7 +34,8 @@ def main():
     rm_parser.add_argument('-n', '--namespace', help='Namespace to delete job from', default='default')
 
     desc_parser = subparsers.add_parser('desc', help='Get info about a job')
-    desc_parser.add_argument('job', help='Name of job to get info about')
+    desc_parser.add_argument('job_name', help='Name of job to get info about')
+    desc_parser.add_argument('-n', '--namespace', help='Namespace to get info from', default='default')
 
     logs_parser = subparsers.add_parser('logs', help='Get logs of a job')
     logs_parser.add_argument('job', help='Name of job to get logs of')
@@ -49,7 +52,8 @@ def main():
 
     if args.command == 'run':
         operator = RUNOperator()
-        print(operator(config=args.config))
+        print(operator(config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace,
+                       name=args.name))
     elif args.command == 'ls':
         operator = LSOperator()
         print(operator(namespace=args.namespace, show_all=args.all, head=args.top))
@@ -57,7 +61,8 @@ def main():
         operator = RMOperator()
         print(operator(job_name=args.job, namespace=args.namespace))
     elif args.command == 'desc':
-        raise NotImplementedError  # TODO implement desc command
+        operator = DESCOperator()
+        print(operator(job_name=args.job_name, namespace=args.namespace))
     elif args.command == 'logs':
         operator = LOGSOperator()
         print(operator(job_name=args.job, namespace=args.namespace, tail=args.tail))

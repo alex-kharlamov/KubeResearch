@@ -23,8 +23,8 @@ class GitConfig(BaseModel):
 
 class VolumeMount(BaseModel):
     name: str
+    type: Literal["pvc", "hostPath"]
     mount_path: str
-    read_only: bool
 
 
 class CodePersistenceConfig(BaseModel):
@@ -34,8 +34,8 @@ class CodePersistenceConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
-    pvc: Optional[List[str]] = None
-    volume: Optional[List[VolumeMount]] = None
+    pvcs: Optional[List[str]] = None
+    volumes: Optional[List[VolumeMount]] = None
 
 
 class ResourceConfig(BaseModel):

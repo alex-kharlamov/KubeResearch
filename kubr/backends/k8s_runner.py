@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Literal
 from typing import Optional
-from kubr.config.runner import ContainerConfig, ResourceConfig
 
+from kubernetes.client import V1HostPathVolumeSource
+
+from kubr.config.runner import ContainerConfig, ResourceConfig, DataConfig
 
 from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1Container,
@@ -25,7 +27,7 @@ ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
 
 
 def create_pod_definition(pod_name: str, resource_config: ResourceConfig, container_config: ContainerConfig,
-                          service_account: Optional[str]) -> "V1Pod":
+                          service_account: Optional[str], data_config: DataConfig) -> "V1Pod":
     limits = {}
     requests = {}
 
@@ -69,11 +71,33 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
     volume_mounts = [
         V1VolumeMount(name=SHM_VOL, mount_path="/dev/shm"),
     ]
+    for volume in data_config.volumes:
+        if volume.type == "hostPath":
+            host_path, mount_path = volume.mount_path.split(":")
+            print(volume)
+            print(f"Mounting {host_path} at {mount_path}")
+            volumes.append(
+                V1Volume(
+                    name=volume.name,
+                    host_path=V1HostPathVolumeSource(
+                        path=host_path,
+                    )
+                )
+            )
+            volume_mounts.append(
+                V1VolumeMount(
+                    name=volume.name,
+                    mount_path=mount_path,
+                )
+            )
+        else:
+            raise ValueError(f"Unknown volume type {volume.type}")
     security_context = V1SecurityContext()
 
     container = V1Container(
-        command=[container_config.entrypoint] + container_config.args,
+        command=container_config.entrypoint.split(),
         image=container_config.image,
+        image_pull_policy="Always",
         name=pod_name,
         env=[
             V1EnvVar(

@@ -82,6 +82,7 @@ class VolcanoBackend(BaseBackend):
                 pod_name=run_config.exp_config.exp_name,
                 resource_config=run_config.resource_config,
                 container_config=run_config.container_config,
+                data_config=run_config.data_config,
                 service_account=None,
             )
 
@@ -107,6 +108,8 @@ class VolcanoBackend(BaseBackend):
             if run_config.exp_config.min_replicas is not None:
                 # first min_replicas tasks are required, afterward optional
                 task["minAvailable"] = 1 if replica_id < run_config.exp_config.min_replicas else 0
+
+            tasks.append(task)
 
         job_spec = {
             "schedulerName": "volcano",
@@ -195,16 +198,32 @@ class VolcanoBackend(BaseBackend):
                                                                namespace=namespace,
                                                                plural='jobs',
                                                                name=job_name)
+        events = self.core_client.list_namespaced_event(namespace=namespace,
+                                                        field_selector=f"involvedObject.name={job_name}")
+        for event in events.items:
+            self.core_client.delete_namespaced_event(name=event.metadata.name, namespace=namespace)
+
         print(resp)
 
-    def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None):
+    def get_job_main_pod(self, job_name: str, namespace: str):
         pods = self.core_client.list_namespaced_pod(namespace=namespace,
                                                     label_selector=f"volcano.sh/job-name={job_name}")
         # TODO add logic for multi pod master-worker selection for logging extraction
         if len(pods.items) == 0:
-            return f'No pods found for job {job_name} in namespace {namespace}'
+            raise Exception(f'No pods found for job {job_name} in namespace {namespace}')
         pod = pods.items[0]
         pod_name = pod.metadata.name
+        return pod_name, pod
+
+    def get_job_events(self, pod_name: str, namespace: str):
+        events = self.core_client.list_namespaced_event(namespace=namespace,
+                                                        field_selector=f"involvedObject.name={pod_name}")
+        return events
+
+
+
+    def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None):
+        pod_name, pod = self.get_job_main_pod(job_name, namespace)
         containers = pod.spec.containers
         if len(containers) == 0:
             return f'No containers found for pod {pod_name} in namespace {namespace}'
@@ -224,3 +243,29 @@ class VolcanoBackend(BaseBackend):
 
         api_response = self.core_client.read_namespaced_pod_log(name=pod_name, namespace=namespace)
         return api_response
+
+    def describe_job(self, job_name: str, namespace: str):
+
+        pod_name, pod = self.get_job_main_pod(job_name, namespace)
+        raw_events = self.get_job_events(pod_name, namespace)
+
+        events = []
+        for event in raw_events.items:
+            events.append({
+                'Last Seen': event.last_timestamp,
+                'From': event.source.component,
+                'Type': event.type,
+                'Reason': event.reason,
+                'Message': event.message
+            })
+        events.sort(key=lambda x: x['Last Seen'], reverse=True)
+        for event in events:
+            event['Last Seen'] = humanize.naturaldelta(datetime.now() - event['Last Seen'].replace(tzinfo=None))
+
+        # TODO add handling events longer than 10
+        events = events[:10]
+
+        events = tabulate(events, headers='keys', tablefmt='grid', maxcolwidths=80)
+
+        return events
+
