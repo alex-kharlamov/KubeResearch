@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 import argcomplete, argparse
 
@@ -11,6 +10,8 @@ from kubr.run.operator import RUNOperator
 
 
 def main():
+    # TODO fix package install adding eval in bash\zsh for autocomplete
+
     backend = VolcanoBackend()
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
     arg.add_argument('--version', help='Get version of Kubr')
@@ -22,10 +23,6 @@ def main():
     run_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
     run_parser.add_argument('-n', '--namespace', help='Namespace to submit job to')
     run_parser.add_argument('--name', help='Name of job')
-    # run_parser.add_argument('-a', '--args', help='Arguments to pass to command')
-    # run_parser.add_argument('-e', '--env', help='Environment variables to pass to command')
-    # run_parser.add_argument('-r', '--resources', help='Resources to request')
-    # run_parser.add_argument('-l', '--labels', help='Labels to add to job')
 
     ls_parser = subparsers.add_parser('ls', help='List all jobs')
     ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
