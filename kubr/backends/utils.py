@@ -1,5 +1,6 @@
 from itertools import zip_longest
 
+
 def join_tables_horizontally(table1, table2, separator=' ' * 4):
     t1_rows = table1.split('\n')
     t2_rows = table2.split('\n')

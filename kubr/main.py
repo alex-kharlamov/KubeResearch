@@ -12,15 +12,15 @@ def main():
     arg.add_argument('--version', help='Get version of Kubr')
     subparsers = arg.add_subparsers(help='Commands', dest='command')
 
-    submit_parser = subparsers.add_parser('run', help='Submit a new job')
-    submit_parser.add_argument('name',  help='Name of job to submit', type=str)
-    submit_parser.add_argument('-i', '--image', help='Image to run')
-    submit_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
-    # submit_parser.add_argument('-a', '--args', help='Arguments to pass to command')
-    # submit_parser.add_argument('-e', '--env', help='Environment variables to pass to command')
-    # submit_parser.add_argument('-r', '--resources', help='Resources to request')
-    # submit_parser.add_argument('-l', '--labels', help='Labels to add to job')
-    submit_parser.add_argument('-n', '--namespace', help='Namespace to submit job to', default='default')
+    run_parser = subparsers.add_parser('run', help='Submit a new job')
+    run_parser.add_argument('config',  help='Path to run config', type=str)
+    # run_parser.add_argument('-i', '--image', help='Image to run')
+    # run_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
+    # run_parser.add_argument('-a', '--args', help='Arguments to pass to command')
+    # run_parser.add_argument('-e', '--env', help='Environment variables to pass to command')
+    # run_parser.add_argument('-r', '--resources', help='Resources to request')
+    # run_parser.add_argument('-l', '--labels', help='Labels to add to job')
+    # run_parser.add_argument('-n', '--namespace', help='Namespace to submit job to', default='default')
 
     ls_parser = subparsers.add_parser('ls', help='List all jobs')
     ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
@@ -48,10 +48,8 @@ def main():
     args = arg.parse_args()
 
     if args.command == 'run':
-        print(f'Running job {args.name} with image {args.image} and command {args.command}')
         operator = RUNOperator()
-        print(operator(job_name=args.name, image=args.image,
-                       entrypoint=args.entrypoint, namespace=args.namespace))
+        print(operator(config=args.config))
     elif args.command == 'ls':
         operator = LSOperator()
         print(operator(namespace=args.namespace, show_all=args.all, head=args.top))

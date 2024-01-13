@@ -24,119 +24,11 @@ from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1VolumeMount,
 )
 from tabulate import tabulate
-
+from kubr.backends.k8s_runner import (
+    create_pod_definition,
+)
+from kubr.config.runner import RunnerConfig
 from kubr.backends.utils import join_tables_horizontally
-
-RESERVED_MILLICPU = 100
-RESERVED_MEMMB = 1024
-
-ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
-
-
-@dataclass
-class PodResource:
-    cpu: int = 0
-    memMB: int = 0
-    gpu: int = 0
-    devices: Dict[str, float] = field(default_factory=dict)
-    capabilities: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class PodConfig:
-    resource: PodResource
-    image: str
-    entrypoint: str
-    args: List[str]
-    env: Dict[str, str] = field(default_factory=dict)
-    port_map: Dict[str, int] = field(default_factory=dict)
-
-
-def create_pod_definition(pod_name: str, pod_config: PodConfig, service_account: Optional[str]) -> "V1Pod":
-    limits = {}
-    requests = {}
-
-    resource = pod_config.resource
-    if resource.cpu > 0:
-        mcpu = int(resource.cpu * 1000)
-        limits["cpu"] = f"{mcpu}m"
-        request_mcpu = max(mcpu - RESERVED_MILLICPU, 0)
-        requests["cpu"] = f"{request_mcpu}m"
-    if resource.memMB > 0:
-        limits["memory"] = f"{int(resource.memMB)}M"
-        request_memMB = max(int(resource.memMB) - RESERVED_MEMMB, 0)
-        requests["memory"] = f"{request_memMB}M"
-    if resource.gpu > 0:
-        requests["nvidia.com/gpu"] = limits["nvidia.com/gpu"] = str(resource.gpu)
-
-    for device_name, device_limit in resource.devices.items():
-        limits[device_name] = str(device_limit)
-
-    resources = V1ResourceRequirements(
-        limits=limits,
-        requests=requests,
-    )
-
-    node_selector: Dict[str, str] = {}
-    # if LABEL_INSTANCE_TYPE in resource.capabilities:
-    #     node_selector[LABEL_INSTANCE_TYPE] = resource.capabilities[LABEL_INSTANCE_TYPE]
-
-    # To support PyTorch dataloaders we need to set /dev/shm to larger than the
-    # 64M default so we mount an unlimited sized tmpfs directory on it.
-    SHM_VOL = "dshm"
-    volumes = [
-        V1Volume(
-            name=SHM_VOL,
-            empty_dir=V1EmptyDirVolumeSource(
-                medium="Memory",
-            ),
-        ),
-    ]
-    volume_mounts = [
-        V1VolumeMount(name=SHM_VOL, mount_path="/dev/shm"),
-    ]
-    security_context = V1SecurityContext()
-
-    container = V1Container(
-        command=[pod_config.entrypoint] + pod_config.args,
-        image=pod_config.image,
-        name=pod_name,
-        env=[
-            V1EnvVar(
-                name=name,
-                value=value,
-            )
-            for name, value in pod_config.env.items()
-        ],
-        resources=resources,
-        ports=[
-            V1ContainerPort(
-                name=name,
-                container_port=port,
-            )
-            for name, port in pod_config.port_map.items()
-        ],
-        volume_mounts=volume_mounts,
-        security_context=security_context,
-    )
-
-    return V1Pod(
-        spec=V1PodSpec(
-            containers=[container],
-            restart_policy="Never",
-            service_account_name=service_account,
-            volumes=volumes,
-            node_selector=node_selector,
-        ),
-        metadata=V1ObjectMeta(
-            annotations={
-                # Disable the istio sidecar as it prevents the containers from
-                # exiting once finished.
-                ANNOTATION_ISTIO_SIDECAR: "false",
-            },
-            labels={},
-        ),
-    )
 
 
 class RetryPolicy(str, Enum):
@@ -182,80 +74,65 @@ class VolcanoBackend(BaseBackend):
         self.crd_client = client.CustomObjectsApi()
         self.core_client = client.CoreV1Api()
 
-    def run_job(self, job_name: str, namespace: str, image: str, entrypoint: str):
-        unique_app_id = job_name
-        queue = "default"
-        job_retries = 0
-        priority_class = None
-        task_name = "main-task"
-        task_max_retries = 0
-        replica_id = 0
-        min_replicas = 1
+    def run_job(self, run_config: RunnerConfig):
+        tasks = []
 
-        pod = create_pod_definition(
-            pod_name=task_name,
-            pod_config=PodConfig(
-                resource=PodResource(
-                    cpu=1,
-                    memMB=1024,
-                    # gpu=1,
-                ),
-                image=image,
-                entrypoint=entrypoint,
-                args=[],
-            ),
-            service_account=None,
-        )
-        # pod.metadata.labels.update(
-        #     pod_labels(
-        #         app=app,
-        #         role_idx=role_idx,
-        #         role=role,
-        #         replica_id=replica_id,
-        #         app_id=unique_app_id,
-        #     )
-        # )
+        for replica_id in range(run_config.resource_config.num_replicas):
+            pod = create_pod_definition(
+                pod_name=run_config.exp_config.exp_name,
+                resource_config=run_config.resource_config,
+                container_config=run_config.container_config,
+                service_account=None,
+            )
 
-        task: Dict[str, Any] = {
-            "replicas": 1,
-            "name": task_name,
-            "template": pod,
-        }
-        if task_max_retries > 0:
-            task["maxRetry"] = task_max_retries
-            task["policies"] = RETRY_POLICIES[RetryPolicy.APPLICATION]
+            # pod.metadata.labels.update(
+            #     pod_labels(
+            #         app=app,
+            #         role_idx=role_idx,
+            #         role=role,
+            #         replica_id=replica_id,
+            #         app_id=unique_app_id,
+            #     )
+            # )
 
-        if min_replicas is not None:
-            # first min_replicas tasks are required, afterward optional
-            task["minAvailable"] = 1 if replica_id < min_replicas else 0
+            task: Dict[str, Any] = {
+                "replicas": 1,
+                "name": run_config.exp_config.task_name,
+                "template": pod,
+            }
+            if run_config.exp_config.task_max_retries > 0:
+                task["maxRetry"] = run_config.exp_config.task_max_retries
+                task["policies"] = RETRY_POLICIES[RetryPolicy.APPLICATION]
 
-        tasks = [task]
+            if run_config.exp_config.min_replicas is not None:
+                # first min_replicas tasks are required, afterward optional
+                task["minAvailable"] = 1 if replica_id < run_config.exp_config.min_replicas else 0
 
         job_spec = {
             "schedulerName": "volcano",
-            "queue": queue,
+            "queue": run_config.exp_config.queue,
             "tasks": tasks,
-            "maxRetry": job_retries,
+            "maxRetry": run_config.exp_config.job_retries,
             "plugins": {
                 # https://github.com/volcano-sh/volcano/issues/533
                 "svc": ["--publish-not-ready-addresses"],
                 "env": [],
             },
         }
-        if priority_class is not None:
-            job_spec["priorityClassName"] = priority_class
+        if run_config.exp_config.priority_class is not None:
+            job_spec["priorityClassName"] = run_config.exp_config.priority_class
 
         resource: Dict[str, object] = {
             "apiVersion": "batch.volcano.sh/v1alpha1",
             "kind": "Job",
-            "metadata": {"name": f"{unique_app_id}"},
+            "metadata": {"name": f"{run_config.exp_config.exp_name}"},
             "spec": job_spec,
         }
 
         resp = self.crd_client.create_namespaced_custom_object(
             group="batch.volcano.sh",
             version="v1alpha1",
-            namespace=namespace,
+            namespace=run_config.exp_config.namespace,
             plural="jobs",
             body=resource,
         )
@@ -277,7 +154,7 @@ class VolcanoBackend(BaseBackend):
                          'Namespace': job['metadata']['namespace'],
                          'State': job['status']['state']['phase'],
                          'Age': datetime.strptime(job['status']['state']['lastTransitionTime'],
-                                                                   '%Y-%m-%dT%H:%M:%SZ')
+                                                  '%Y-%m-%dT%H:%M:%SZ')
                          }
             if namespace != 'All' and job_state['Namespace'] != namespace:
                 continue

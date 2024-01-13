@@ -15,7 +15,9 @@ dependencies = [
     "argcomplete==3.2.1",
     "kubernetes==28.1.0",
     "tabulate==0.8.9",
-    "humanize==4.9.0"
+    "humanize==4.9.0",
+    "pydantic==2.5.3",
+    "pydantic-yaml==1.2.0"
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
