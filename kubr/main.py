@@ -1,6 +1,8 @@
+#!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 import argcomplete, argparse
 
+from kubr.backends.volcano import VolcanoBackend
 from kubr.desc.operator import DESCOperator
 from kubr.logs.operator import LOGSOperator
 from kubr.ls.operator import LSOperator
@@ -9,6 +11,7 @@ from kubr.run.operator import RUNOperator
 
 
 def main():
+    backend = VolcanoBackend()
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
     arg.add_argument('--version', help='Get version of Kubr')
     subparsers = arg.add_subparsers(help='Commands', dest='command')
@@ -30,7 +33,7 @@ def main():
     ls_parser.add_argument('-t', '--top', help='Show only first T jobs', default=None, type=int)
 
     rm_parser = subparsers.add_parser('rm', help='Delete a job')
-    rm_parser.add_argument('job', help='Name of job to delete')
+    rm_parser.add_argument('job', help='Name of job to delete').completer = backend._completion_list_running_jobs
     rm_parser.add_argument('-n', '--namespace', help='Namespace to delete job from', default='default')
 
     desc_parser = subparsers.add_parser('desc', help='Get info about a job')
@@ -38,7 +41,7 @@ def main():
     desc_parser.add_argument('-n', '--namespace', help='Namespace to get info from', default='default')
 
     logs_parser = subparsers.add_parser('logs', help='Get logs of a job')
-    logs_parser.add_argument('job', help='Name of job to get logs of')
+    logs_parser.add_argument('job', help='Name of job to get logs of').completer = backend._completion_list_running_jobs
     logs_parser.add_argument('-n', '--namespace', help='Namespace to get logs from', default='default')
     logs_parser.add_argument('-t', '--tail', help='Number of lines to show', default=10, type=int)
 

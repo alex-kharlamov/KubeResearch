@@ -141,6 +141,18 @@ class VolcanoBackend(BaseBackend):
         )
         print(resp)
 
+    def _completion_list_running_jobs(self, **kwargs):
+        print("Using completion list for running jobs")
+        jobs_stat = self.crd_client.list_cluster_custom_object(group='batch.volcano.sh',
+                                                               version='v1alpha1',
+                                                               plural='jobs')
+        jobs = jobs_stat['items']
+        running_jobs = []
+        for job in jobs:
+            if job['status']['state']['phase'] == 'Running':
+                running_jobs.append(job['metadata']['name'])
+        return running_jobs
+
     def list_jobs(self, namespace: str = 'All', show_all: bool = False, head: int = None):
         # TODO [ls] show used resources
         # TODO [ls] speedup for selected namespace(filter on server side)
