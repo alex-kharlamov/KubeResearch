@@ -4,7 +4,6 @@ from dataclasses import field, dataclass
 from enum import Enum
 from typing import Literal, Dict, Any, Mapping, Iterable, List, Optional
 from datetime import datetime
-import humanize
 
 from kubr.backends.base import BaseBackend
 from kubernetes import client, config, watch
@@ -23,12 +22,13 @@ from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1Volume,
     V1VolumeMount,
 )
-from tabulate import tabulate
+
 from kubr.backends.k8s_runner import (
     create_pod_definition,
 )
 from kubr.config.runner import RunnerConfig
 from kubr.backends.utils import join_tables_horizontally
+from kubr.config.job import Job
 
 
 class RetryPolicy(str, Enum):
@@ -153,7 +153,7 @@ class VolcanoBackend(BaseBackend):
                 running_jobs.append(job['metadata']['name'])
         return running_jobs
 
-    def list_jobs(self, namespace: str = 'All', show_all: bool = False, head: int = None):
+    def list_jobs(self, namespace: str = 'All'):
         # TODO [ls] show used resources
         # TODO [ls] speedup for selected namespace(filter on server side)
         # TODO [ls] show events for pending jobs
@@ -164,25 +164,21 @@ class VolcanoBackend(BaseBackend):
 
         extracted_jobs = []
         for k8s_job in k8s_jobs:
-            job = Job
-             = {'Name': job['metadata']['name'],
-                         'Namespace': job['metadata']['namespace'],
-                         'State': job['status']['state']['phase'],
-                         'Age': datetime.strptime(job['status']['state']['lastTransitionTime'],
-                                                  '%Y-%m-%dT%H:%M:%SZ')
-                         }
-            if namespace != 'All' and job_state['Namespace'] != namespace:
+            if namespace != 'All' and k8s_job['metadata']['namespace'] != namespace:
                 continue
+            job = Job(type='Volcano',
+                      name=k8s_job['metadata']['name'],
+                      namespace=k8s_job['metadata']['namespace'],
+                      state=k8s_job['status']['state']['phase'],
+                      age=datetime.strptime(k8s_job['status']['state']['lastTransitionTime'],
+                                            '%Y-%m-%dT%H:%M:%SZ')
+                      )
+            extracted_jobs.append(job)
 
-            if job_state['State'] in ['Pending', 'Running', 'Failed', 'Completed']:
-                extracted_jobs[job_state['State']].append(job_state)
-            else:
-                extracted_jobs['extra'].append(job_state)
-
-
-
+        return extracted_jobs
 
     def delete_job(self, job_name: str, namespace: str):
+        # TODO add cli response formatting for deletion confirmation
         resp = self.crd_client.delete_namespaced_custom_object(group='batch.volcano.sh',
                                                                version='v1alpha1',
                                                                namespace=namespace,
@@ -209,8 +205,6 @@ class VolcanoBackend(BaseBackend):
         events = self.core_client.list_namespaced_event(namespace=namespace,
                                                         field_selector=f"involvedObject.name={pod_name}")
         return events
-
-
 
     def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None):
         pod_name, pod = self.get_job_main_pod(job_name, namespace)
@@ -258,4 +252,3 @@ class VolcanoBackend(BaseBackend):
         events = tabulate(events, headers='keys', tablefmt='grid', maxcolwidths=80)
 
         return events
-

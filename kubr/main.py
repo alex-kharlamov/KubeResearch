@@ -1,73 +1,56 @@
 # PYTHON_ARGCOMPLETE_OK
-import argcomplete, argparse
+import argcomplete
+import argparse
 
 from kubr.backends.volcano import VolcanoBackend
-from kubr.desc.operator import DESCOperator
-from kubr.logs.operator import LOGSOperator
-from kubr.ls.operator import LSOperator
-from kubr.rm.operator import RMOperator
-from kubr.run.operator import RUNOperator
+from kubr.commands.desc import DescribeCommand
+from kubr.commands.logs import LogsCommand
+from kubr.commands.ls import LsCommand
+from kubr.commands.rm import RmCommand
+from kubr.commands.run import RunCommand
 
 
 def main():
     # TODO fix package install adding eval in bash\zsh for autocomplete
+    # adding eval "$(register-python-argcomplete kubr)" to .bashrc or .zshrc
 
     backend = VolcanoBackend()
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
     arg.add_argument('--version', help='Get version of Kubr')
     subparsers = arg.add_subparsers(help='Commands', dest='command')
 
-    run_parser = subparsers.add_parser('run', help='Submit a new job')
-    run_parser.add_argument('config',  help='Path to run config', type=str)
-    run_parser.add_argument('-i', '--image', help='Image to run')
-    run_parser.add_argument('-e', '--entrypoint', help='Entrypoint to run')
-    run_parser.add_argument('-n', '--namespace', help='Namespace to submit job to')
-    run_parser.add_argument('--name', help='Name of job')
+    run_parser = RunCommand.add_parser(subparsers)
+    ls_parser = LsCommand.add_parser(subparsers)
+    rm_parser = RmCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    desc_parser = DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    logs_parser = LogsCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
 
-    ls_parser = subparsers.add_parser('ls', help='List all jobs')
-    ls_parser.add_argument('-n', '--namespace', help='Namespace to list jobs from', default='All')
-    ls_parser.add_argument('-a', '--all', help='Show all jobs', action='store_true', default=False)
-    ls_parser.add_argument('-t', '--top', help='Show only first T jobs', default=None, type=int)
-
-    rm_parser = subparsers.add_parser('rm', help='Delete a job')
-    rm_parser.add_argument('job', help='Name of job to delete').completer = backend._completion_list_running_jobs
-    rm_parser.add_argument('-n', '--namespace', help='Namespace to delete job from', default='default')
-
-    desc_parser = subparsers.add_parser('desc', help='Get info about a job')
-    desc_parser.add_argument('job_name', help='Name of job to get info about')
-    desc_parser.add_argument('-n', '--namespace', help='Namespace to get info from', default='default')
-
-    logs_parser = subparsers.add_parser('logs', help='Get logs of a job')
-    logs_parser.add_argument('job', help='Name of job to get logs of').completer = backend._completion_list_running_jobs
-    logs_parser.add_argument('-n', '--namespace', help='Namespace to get logs from', default='default')
-    logs_parser.add_argument('-t', '--tail', help='Number of lines to show', default=10, type=int)
-
-    attach_parser = subparsers.add_parser('attach', help='Attach to a job')
-    attach_parser.add_argument('job', help='Name of job to attach to')
-
-    stat_parser = subparsers.add_parser('stat', help='Get stats of a cluster')
+    # attach_parser = subparsers.add_parser('attach', help='Attach to a job')
+    # attach_parser.add_argument('job', help='Name of job to attach to')
+    #
+    # stat_parser = subparsers.add_parser('stat', help='Get stats of a cluster')
 
     argcomplete.autocomplete(arg)
     args = arg.parse_args()
 
     if args.command == 'run':
-        operator = RUNOperator()
+        operator = RunCommand()
         print(operator(config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace,
                        name=args.name))
     elif args.command == 'ls':
-        operator = LSOperator()
+        operator = LsCommand()
         print(operator(namespace=args.namespace, show_all=args.all, head=args.top))
     elif args.command == 'rm':
-        operator = RMOperator()
+        operator = RmCommand()
         print(operator(job_name=args.job, namespace=args.namespace))
     elif args.command == 'desc':
-        operator = DESCOperator()
+        operator = DescribeCommand()
         print(operator(job_name=args.job_name, namespace=args.namespace))
     elif args.command == 'logs':
-        operator = LOGSOperator()
+        operator = LogsCommand()
         print(operator(job_name=args.job, namespace=args.namespace, tail=args.tail))
     elif args.command == 'attach':
-        raise NotImplementedError   # TODO implement attach command
+        raise NotImplementedError  # TODO implement attach command
     elif args.command == 'stat':
         raise NotImplementedError  # TODO implement stat command
     elif args.command == 'test':
