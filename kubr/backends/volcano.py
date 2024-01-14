@@ -29,7 +29,8 @@ from kubr.backends.k8s_runner import (
 from kubr.config.runner import RunnerConfig
 from kubr.backends.utils import join_tables_horizontally
 from kubr.config.job import Job
-
+import humanize
+from tabulate import tabulate
 
 class RetryPolicy(str, Enum):
     """
@@ -77,7 +78,7 @@ class VolcanoBackend(BaseBackend):
     def run_job(self, run_config: RunnerConfig):
         tasks = []
 
-        for replica_id in range(run_config.resource_config.num_replicas):
+        for replica_id in range(run_config.resources.num_replicas):
             pod = create_pod_definition(
                 pod_name=run_config.experiment.name,
                 resource_config=run_config.resources,
@@ -98,44 +99,44 @@ class VolcanoBackend(BaseBackend):
 
             task: Dict[str, Any] = {
                 "replicas": 1,
-                "name": run_config.exp_config.task_name,
+                "name": run_config.experiment.task_name,
                 "template": pod,
             }
-            if run_config.exp_config.task_max_retries > 0:
-                task["maxRetry"] = run_config.exp_config.task_max_retries
+            if run_config.experiment.task_max_retries > 0:
+                task["maxRetry"] = run_config.experiment.task_max_retries
                 task["policies"] = RETRY_POLICIES[RetryPolicy.APPLICATION]
 
-            if run_config.exp_config.min_replicas is not None:
+            if run_config.experiment.min_replicas is not None:
                 # first min_replicas tasks are required, afterward optional
-                task["minAvailable"] = 1 if replica_id < run_config.exp_config.min_replicas else 0
+                task["minAvailable"] = 1 if replica_id < run_config.experiment.min_replicas else 0
 
             tasks.append(task)
 
         job_spec = {
             "schedulerName": "volcano",
-            "queue": run_config.exp_config.queue,
+            "queue": run_config.experiment.queue,
             "tasks": tasks,
-            "maxRetry": run_config.exp_config.job_retries,
+            "maxRetry": run_config.experiment.job_retries,
             "plugins": {
                 # https://github.com/volcano-sh/volcano/issues/533
                 "svc": ["--publish-not-ready-addresses"],
                 "env": [],
             },
         }
-        if run_config.exp_config.priority_class is not None:
-            job_spec["priorityClassName"] = run_config.exp_config.priority_class
+        if run_config.experiment.priority_class is not None:
+            job_spec["priorityClassName"] = run_config.experiment.priority_class
 
         resource: Dict[str, object] = {
             "apiVersion": "batch.volcano.sh/v1alpha1",
             "kind": "Job",
-            "metadata": {"name": f"{run_config.exp_config.exp_name}"},
+            "metadata": {"name": f"{run_config.experiment.name}"},
             "spec": job_spec,
         }
 
         resp = self.crd_client.create_namespaced_custom_object(
             group="batch.volcano.sh",
             version="v1alpha1",
-            namespace=run_config.exp_config.namespace,
+            namespace=run_config.experiment.namespace,
             plural="jobs",
             body=resource,
         )

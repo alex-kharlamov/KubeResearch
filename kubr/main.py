@@ -13,6 +13,7 @@ from kubr.commands.run import RunCommand
 def main():
     # TODO fix package install adding eval in bash\zsh for autocomplete
     # adding eval "$(register-python-argcomplete kubr)" to .bashrc or .zshrc
+    # TODO fix autopilot deployment in GKE autopilot
 
     backend = VolcanoBackend()
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
@@ -38,7 +39,7 @@ def main():
                        name=args.name))
     elif args.command == 'ls':
         operator = LsCommand()
-        print(operator(namespace=args.namespace, show_all=args.all, head=args.top))
+        operator(namespace=args.namespace, show_all=args.all, head=args.top)
     elif args.command == 'rm':
         operator = RmCommand()
         print(operator(job_name=args.job, namespace=args.namespace))

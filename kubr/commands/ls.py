@@ -31,11 +31,14 @@ def visualize_jobs(jobs: List[Job], head: Optional[int] = 10, show_all: bool = F
             extracted_jobs[state] = extracted_jobs[state][:5]
 
         dict_jobs = [job.dict() for job in extracted_jobs[state]]
-        extracted_jobs[state] = tabulate(dict_jobs, headers='keys', tablefmt='grid')
+        if len(dict_jobs):
+            extracted_jobs[state] = tabulate(dict_jobs, headers='keys', tablefmt='grid')
+        else:
+            extracted_jobs[state] = ''
 
     # TODO pretty handling of empty list in running jobs
     result = join_tables_horizontally(extracted_jobs['Running'], extracted_jobs['Pending'])
-    result += '\n\n'
+    result += '\n\n' if len(result) else ''
     result += join_tables_horizontally(extracted_jobs['Completed'], extracted_jobs['Failed'])
 
     if show_all:

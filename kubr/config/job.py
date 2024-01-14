@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 import datetime
-from typing import Literal
+from typing import Literal, Union
 
 
 class Job(BaseModel):
@@ -8,4 +8,4 @@ class Job(BaseModel):
     name: str
     namespace: str
     state: str
-    age: datetime.datetime
+    age: Union[datetime.datetime, str]
