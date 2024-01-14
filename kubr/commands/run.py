@@ -24,9 +24,9 @@ class RunCommand(BaseCommand):
             config = f.read()
         config = parse_yaml_raw_as(RunnerConfig, config)
 
-        config.exp_config.exp_name = name or config.exp_config.exp_name
-        config.container_config.image = image or config.container_config.image
-        config.container_config.entrypoint = entrypoint or config.container_config.entrypoint
-        config.exp_config.namespace = namespace or config.exp_config.namespace
+        config.experiment.name = name or config.experiment.name
+        config.container.image = image or config.container.image
+        config.container.entrypoint = entrypoint or config.container.entrypoint
+        config.experiment.namespace = namespace or config.experiment.namespace
 
         return self.backend.run_job(config)

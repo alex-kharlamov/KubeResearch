@@ -79,10 +79,10 @@ class VolcanoBackend(BaseBackend):
 
         for replica_id in range(run_config.resource_config.num_replicas):
             pod = create_pod_definition(
-                pod_name=run_config.exp_config.exp_name,
-                resource_config=run_config.resource_config,
-                container_config=run_config.container_config,
-                data_config=run_config.data_config,
+                pod_name=run_config.experiment.name,
+                resource_config=run_config.resources,
+                container_config=run_config.container,
+                data_config=run_config.data,
                 service_account=None,
             )
 

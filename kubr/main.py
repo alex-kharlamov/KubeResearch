@@ -25,10 +25,9 @@ def main():
     desc_parser = DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     logs_parser = LogsCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
 
-    # attach_parser = subparsers.add_parser('attach', help='Attach to a job')
-    # attach_parser.add_argument('job', help='Name of job to attach to')
-    #
-    # stat_parser = subparsers.add_parser('stat', help='Get stats of a cluster')
+    # attach_parser = AttachCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    # stat_parser = StatCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    # test_parser = TestCommand.add_parser(subparsers)
 
     argcomplete.autocomplete(arg)
     args = arg.parse_args()

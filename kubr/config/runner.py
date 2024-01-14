@@ -50,7 +50,7 @@ class ResourceConfig(BaseModel):
 
 
 class ExperimentConfig(BaseModel):
-    exp_name: str
+    name: str
     namespace: str
 
     args: List[str] = field(default_factory=list)
@@ -66,9 +66,9 @@ class ExperimentConfig(BaseModel):
 
 
 class RunnerConfig(BaseModel):
-    container_config: ContainerConfig
-    resource_config: ResourceConfig
-    job_type: Literal["Volcano"] = "Volcano"
-    code_persistence_config: Optional[CodePersistenceConfig] = None
-    data_config: Optional[DataConfig] = None
-    exp_config: Optional[ExperimentConfig] = None
+    container: ContainerConfig
+    resources: ResourceConfig
+    type: Literal["Volcano"] = "Volcano"
+    code: Optional[CodePersistenceConfig] = None
+    data: Optional[DataConfig] = None
+    experiment: Optional[ExperimentConfig] = None
