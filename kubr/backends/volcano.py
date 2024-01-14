@@ -160,12 +160,12 @@ class VolcanoBackend(BaseBackend):
         jobs_stat = self.crd_client.list_cluster_custom_object(group='batch.volcano.sh',
                                                                version='v1alpha1',
                                                                plural='jobs')
-        jobs = jobs_stat['items']
+        k8s_jobs = jobs_stat['items']
 
-        extracted_jobs = defaultdict(list)
-        for job in jobs:
-            # TODO convert server time to local to fix humanize.naturaldelta timezone handling
-            job_state = {'Name': job['metadata']['name'],
+        extracted_jobs = []
+        for k8s_job in k8s_jobs:
+            job = Job
+             = {'Name': job['metadata']['name'],
                          'Namespace': job['metadata']['namespace'],
                          'State': job['status']['state']['phase'],
                          'Age': datetime.strptime(job['status']['state']['lastTransitionTime'],
@@ -179,30 +179,8 @@ class VolcanoBackend(BaseBackend):
             else:
                 extracted_jobs['extra'].append(job_state)
 
-        for state in ['Pending', 'Running', 'Completed', 'Failed', 'extra']:
-            extracted_jobs[state].sort(key=lambda x: x['Age'], reverse=True)
-            for job in extracted_jobs[state]:
-                job['Age'] = humanize.naturaldelta(datetime.utcnow() - job['Age'])
-            if head:
-                extracted_jobs[state] = extracted_jobs[state][:head]
 
-            # TODO [ls] add pretty formatting that will show only first 10 jobs in completed and failed states are shown
-            if not show_all and state in ['Completed', 'Failed']:
-                extracted_jobs[state] = extracted_jobs[state][:5]
 
-            extracted_jobs[state] = tabulate(extracted_jobs[state], headers='keys', tablefmt='grid')
-
-        # TODO pretty handling of empty list in running jobs
-        result = join_tables_horizontally(extracted_jobs['Running'], extracted_jobs['Pending'])
-        result += '\n\n'
-        result += join_tables_horizontally(extracted_jobs['Completed'], extracted_jobs['Failed'])
-
-        if show_all:
-            result += '\n\n'
-            # TODO pretty handling of empty list in all jobs
-            result += extracted_jobs['extra']
-
-        return result
 
     def delete_job(self, job_name: str, namespace: str):
         resp = self.crd_client.delete_namespaced_custom_object(group='batch.volcano.sh',
