@@ -14,6 +14,7 @@ def main():
     # TODO fix package install adding eval in bash\zsh for autocomplete
     # adding eval "$(register-python-argcomplete kubr)" to .bashrc or .zshrc
     # TODO fix autopilot deployment in GKE autopilot
+    # TODO fix Volcano priority class in GKE (https://github.com/volcano-sh/volcano/issues/2379)
 
     backend = VolcanoBackend()
     arg = argparse.ArgumentParser(description='Kubr', add_help=True)
