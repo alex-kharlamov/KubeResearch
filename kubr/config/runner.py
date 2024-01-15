@@ -66,9 +66,9 @@ class ExperimentConfig(BaseModel):
 
 
 class RunnerConfig(BaseModel):
+    experiment: ExperimentConfig
     container: ContainerConfig
     resources: ResourceConfig
     type: Literal["Volcano"] = "Volcano"
     code: Optional[CodePersistenceConfig] = None
     data: Optional[DataConfig] = None
-    experiment: Optional[ExperimentConfig] = None
