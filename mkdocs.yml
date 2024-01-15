@@ -1,0 +1,31 @@
+site_name: Kubr
+repo_url: https://github.com/alex-kharlamov/KubeResearch
+repo_name: KubeResearch
+site_author: Alex Kharlamov
+
+plugins:
+- mkdocstrings:
+    enabled: !ENV [ENABLE_MKDOCSTRINGS, true]
+#    custom_templates: templates
+    default_handler: python
+    handlers:
+      python:
+        paths: [src]
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - mkautodoc
+
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.indexes
+
+nav:
+  - "Config": config.md
