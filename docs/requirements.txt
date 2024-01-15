@@ -1,3 +1,4 @@
 mkdocstrings
 mkdocstrings-python
 mkautodoc
+mkdocs-material
