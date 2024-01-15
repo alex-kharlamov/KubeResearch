@@ -10,12 +10,14 @@ plugins:
     default_handler: python
     handlers:
       python:
-        paths: [src]
+        paths: [kubr]
 
 markdown_extensions:
   - admonition
   - codehilite
   - mkautodoc
+  - pymdownx.snippets:
+      check_paths: true
 
 
 theme:

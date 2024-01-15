@@ -3,3 +3,4 @@ mkdocstrings-python
 mkautodoc
 mkdocs-material
 pydantic
+kubr
