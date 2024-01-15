@@ -120,6 +120,7 @@ class RunnerConfig(BaseModel):
         type (Literal["Volcano"], optional): Type of runner. Defaults to "Volcano".
         code (Optional[CodePersistenceConfig], optional): Code persistence configuration. Defaults to None.
         data (Optional[DataConfig], optional): Data configuration. Defaults to None.
+
     """
     experiment: ExperimentConfig
     container: ContainerConfig

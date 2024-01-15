@@ -10,24 +10,40 @@ plugins:
     default_handler: python
     handlers:
       python:
-        paths: [kubr]
+        paths: [.]
+        options:
+          docstring_style: google
+          show_root_heading: true
+#          merge_init_into_class: true
+#          show_submodules: true
 
 markdown_extensions:
-  - admonition
-  - codehilite
-  - mkautodoc
-  - pymdownx.snippets:
-      check_paths: true
+- tables
+- toc:
+    permalink: true
+    title: Page contents
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+- pymdownx.highlight:
+    pygments_lang_class: true
+- pymdownx.extra
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.tabbed:
+    alternate_style: true
 
+
+watch:
+  - kubr/
 
 theme:
   name: material
   features:
     - navigation.instant
-    - navigation.instant.prefetch
     - navigation.tracking
-    - navigation.tabs
-    - navigation.indexes
+    - navigation.sections
 
 nav:
   - "Config": config.md

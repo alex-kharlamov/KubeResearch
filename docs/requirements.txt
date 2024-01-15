@@ -4,3 +4,5 @@ mkautodoc
 mkdocs-material
 pydantic
 kubr
+markdown
+Pygments
