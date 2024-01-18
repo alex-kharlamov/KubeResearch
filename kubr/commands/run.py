@@ -1,9 +1,21 @@
+from datetime import datetime
 from typing import Optional
+
+import humanize
+from tabulate import tabulate
 
 from kubr.backends.volcano import VolcanoBackend
 from kubr.commands.base import BaseCommand
+from kubr.commands.utils.drawing import generate_jobs_table
 from kubr.config.runner import RunnerConfig
 from pydantic_yaml import parse_yaml_raw_as
+from rich import print
+
+
+def visualize_job(job):
+    job.age = humanize.naturaldelta(datetime.utcnow() - job.age)
+    print(generate_jobs_table([job], title=str(JobState,Pending)))
+
 
 class RunCommand(BaseCommand):
     @staticmethod
@@ -20,6 +32,8 @@ class RunCommand(BaseCommand):
     def __call__(self, config: str, image: Optional[str] = None,
                  name: Optional[str] = None, entrypoint: Optional[str] = None,
                  namespace: Optional[str] = None):
+        # TODO [run] check if config exists on cluster and ask to resubmit
+
         with open(config, 'r') as f:
             config = f.read()
         config = parse_yaml_raw_as(RunnerConfig, config)
@@ -29,4 +43,6 @@ class RunCommand(BaseCommand):
         config.container.entrypoint = entrypoint or config.container.entrypoint
         config.experiment.namespace = namespace or config.experiment.namespace
 
-        return self.backend.run_job(config)
+        job = self.backend.run_job(config)
+        visualize_job(job)
+

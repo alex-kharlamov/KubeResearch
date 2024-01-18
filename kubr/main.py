@@ -36,20 +36,20 @@ def main():
 
     if args.command == 'run':
         operator = RunCommand()
-        print(operator(config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace,
-                       name=args.name))
+        operator(config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace,
+                 name=args.name)
     elif args.command == 'ls':
         operator = LsCommand()
         operator(namespace=args.namespace, show_all=args.all, head=args.top)
     elif args.command == 'rm':
         operator = RmCommand()
-        print(operator(job_name=args.job, namespace=args.namespace))
+        operator(job_name=args.job, namespace=args.namespace)
     elif args.command == 'desc':
         operator = DescribeCommand()
-        print(operator(job_name=args.job_name, namespace=args.namespace))
+        operator(job_name=args.job_name, namespace=args.namespace)
     elif args.command == 'logs':
         operator = LogsCommand()
-        print(operator(job_name=args.job, namespace=args.namespace, tail=args.tail))
+        operator(job_name=args.job, namespace=args.namespace, tail=args.tail)
     elif args.command == 'attach':
         raise NotImplementedError  # TODO implement attach command
     elif args.command == 'stat':

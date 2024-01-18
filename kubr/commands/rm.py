@@ -1,5 +1,9 @@
-from kubr.backends.volcano import VolcanoBackend
+from enum import Enum
+
+from kubr.backends.base import DeleteStatus
 from kubr.commands.base import BaseCommand
+from kubr.commands.utils.drawing import mascot_message
+from rich import print
 
 
 class RmCommand(BaseCommand):
@@ -11,4 +15,14 @@ class RmCommand(BaseCommand):
         return rm_parser
 
     def __call__(self, job_name: str, namespace: str = 'default'):
-        return self.backend.delete_job(job_name=job_name, namespace=namespace)
+        # TODO [rm] add regular expression matching for job names
+        # TODO [rm] add confirmation prompt
+        # TODO [rm] add completion for namespace typing
+        try:
+            status = self.backend.delete_job(job_name=job_name, namespace=namespace)
+        except Exception as e:
+            print(mascot_message(f"Job {job_name} deletion failed!"))
+            return
+
+        if status == DeleteStatus.Success:
+            print(mascot_message(f"Job {job_name} was deleted successfully!"))

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Literal
 from typing import Optional
 
-from kubernetes.client import V1HostPathVolumeSource
+from kubernetes.client import V1HostPathVolumeSource, V1EnvVarSource, V1SecretKeySelector
 
 from kubr.config.runner import ContainerConfig, ResourceConfig, DataConfig
 
@@ -27,7 +27,7 @@ ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
 
 
 def create_pod_definition(pod_name: str, resource_config: ResourceConfig, container_config: ContainerConfig,
-                          service_account: Optional[str], data_config: DataConfig) -> "V1Pod":
+                          service_account: Optional[str], data_config: DataConfig, init_container_config: ContainerConfig) -> "V1Pod":
     limits = {}
     requests = {}
 
@@ -36,17 +36,17 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
         limits["cpu"] = f"{mcpu}m"
         request_mcpu = max(mcpu - RESERVED_MILLICPU, 0)
         requests["cpu"] = f"{request_mcpu}m"
-    if resource_config.memMB > 0:
-        limits["memory"] = f"{int(resource_config.memMB)}M"
-        request_memMB = max(int(resource_config.memMB) - RESERVED_MEMMB, 0)
+    if resource_config.memory > 0:
+        limits["memory"] = f"{int(resource_config.memory * 2 ** 10)}M"
+        request_memMB = max(int(resource_config.memory) - RESERVED_MEMMB, 0)
         requests["memory"] = f"{request_memMB}M"
     if resource_config.gpu > 0:
         requests["nvidia.com/gpu"] = limits["nvidia.com/gpu"] = str(resource_config.gpu)
     if resource_config.ib > 0:
         requests[resource_config.ib_device] = limits[resource_config.ib_device] = str(resource_config.ib)
 
-    for device_name, device_limit in resource_config.devices.items():
-        limits[device_name] = str(device_limit)
+    # for device_name, device_limit in resource_config.devices.items():
+    #     limits[device_name] = str(device_limit)
 
     resources = V1ResourceRequirements(
         limits=limits,
@@ -71,55 +71,77 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
     volume_mounts = [
         V1VolumeMount(name=SHM_VOL, mount_path="/dev/shm"),
     ]
-    for volume in data_config.volumes:
-        if volume.type == "hostPath":
-            host_path, mount_path = volume.mount_path.split(":")
-            print(volume)
-            print(f"Mounting {host_path} at {mount_path}")
-            volumes.append(
-                V1Volume(
-                    name=volume.name,
-                    host_path=V1HostPathVolumeSource(
-                        path=host_path,
+    if data_config is not None:
+        for volume in data_config.volumes:
+            if volume.type == "hostPath":
+                host_path, mount_path = volume.mount_path.split(":")
+                volumes.append(
+                    V1Volume(
+                        name=volume.name,
+                        host_path=V1HostPathVolumeSource(
+                            path=host_path,
+                        )
                     )
                 )
-            )
-            volume_mounts.append(
-                V1VolumeMount(
-                    name=volume.name,
-                    mount_path=mount_path,
+                volume_mounts.append(
+                    V1VolumeMount(
+                        name=volume.name,
+                        mount_path=mount_path,
+                    )
                 )
-            )
-        else:
-            raise ValueError(f"Unknown volume type {volume.type}")
+            else:
+                raise ValueError(f"Unknown volume type {volume.type}")
     security_context = V1SecurityContext()
 
+    container_envs = []
+    for env in container_config.env:
+        container_envs.append(V1EnvVar(
+            name=env.name,
+            value=env.value,
+        ))
+    for secret in container_config.secrets:
+        container_envs.append(V1EnvVar(
+            name=secret.env,
+            value_from=V1EnvVarSource(
+                secret_key_ref=V1SecretKeySelector(
+                    name=secret.secret_name,
+                    key=secret.secret_key,
+                ),
+            ),
+        ))
+
+    # port_maps = [
+    #     V1ContainerPort(
+    #         name=name,
+    #         container_port=port,
+    #     )
+    #     for name, port in container_config.port_map.items()
+    # ]
+    port_maps = []
+    init_containers = []
+    if init_container_config is not None:
+        # TODO [run] support env handling for init_container
+        init_containers.append(V1Container(command=init_container_config.entrypoint.split() if init_container_config.entrypoint is not None else None,
+                                           image=init_container_config.image,
+                                           image_pull_policy="Always",
+                                           name=f"{pod_name}-init",
+                                           ))
+
     container = V1Container(
-        command=container_config.entrypoint.split(),
+        command=container_config.entrypoint.split() if container_config.entrypoint is not None else None,
         image=container_config.image,
         image_pull_policy="Always",
         name=pod_name,
-        env=[
-            V1EnvVar(
-                name=name,
-                value=value,
-            )
-            for name, value in container_config.env.items()
-        ],
+        env=container_envs,
         resources=resources,
-        ports=[
-            V1ContainerPort(
-                name=name,
-                container_port=port,
-            )
-            for name, port in container_config.port_map.items()
-        ],
+        ports=port_maps,
         volume_mounts=volume_mounts,
         security_context=security_context,
     )
 
     return V1Pod(
         spec=V1PodSpec(
+            init_containers=init_containers,
             containers=[container],
             restart_policy="Never",
             service_account_name=service_account,

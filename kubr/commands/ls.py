@@ -2,20 +2,24 @@ from kubr.backends.volcano import VolcanoBackend
 from typing import List
 
 from kubr.commands.base import BaseCommand
-from kubr.config.job import Job
+from kubr.config.job import Job, JobState
 from collections import defaultdict
 import humanize
 from tabulate import tabulate
 from typing import Optional
 from kubr.backends.utils import join_tables_horizontally
 from datetime import datetime
+from kubr.commands.utils.drawing import mascot_message, generate_jobs_table
+from rich import print
+from rich.columns import Columns
+from rich.table import Table
 
 
 def visualize_jobs(jobs: List[Job], head: Optional[int] = 10, show_all: bool = False):
     extracted_jobs = defaultdict(list)
     for job in jobs:
-        if job.state in ['Pending', 'Running', 'Failed', 'Completed']:
-            extracted_jobs[job.state].append(job)
+        if job.state in [JobState.Pending, JobState.Running, JobState.Completed, JobState.Failed]:
+            extracted_jobs[str(job.state)].append(job)
         else:
             extracted_jobs['extra'].append(job)
 
@@ -30,23 +34,17 @@ def visualize_jobs(jobs: List[Job], head: Optional[int] = 10, show_all: bool = F
         if not show_all and state in ['Completed', 'Failed']:
             extracted_jobs[state] = extracted_jobs[state][:5]
 
-        dict_jobs = [job.dict() for job in extracted_jobs[state]]
-        if len(dict_jobs):
-            extracted_jobs[state] = tabulate(dict_jobs, headers='keys', tablefmt='grid')
+        if len(extracted_jobs[state]):
+            extracted_jobs[state] = generate_jobs_table(jobs=extracted_jobs[state], state=state)
         else:
-            extracted_jobs[state] = ''
+            extracted_jobs[state] = mascot_message(f"No {state} jobs found!")
 
-    # TODO pretty handling of empty list in running jobs
-    result = join_tables_horizontally(extracted_jobs['Running'], extracted_jobs['Pending'])
-    result += '\n\n' if len(result) else ''
-    result += join_tables_horizontally(extracted_jobs['Completed'], extracted_jobs['Failed'])
+    result = [extracted_jobs['Running'], extracted_jobs['Pending'], extracted_jobs['Completed'], extracted_jobs['Failed']]
 
     if show_all:
-        result += '\n\n'
-        # TODO pretty handling of empty list in all jobs
-        result += extracted_jobs['extra']
+        result.append(extracted_jobs['extra'])
 
-    return result
+    return Columns(result, equal=True,)
 
 
 class LsCommand(BaseCommand):

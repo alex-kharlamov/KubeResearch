@@ -27,10 +27,13 @@ from kubr.backends.k8s_runner import (
     create_pod_definition,
 )
 from kubr.config.runner import RunnerConfig
+from kubr.config.job import JobType, JobBackend, JobState
+from kubr.backends.base import BaseBackend, DeleteStatus
 from kubr.backends.utils import join_tables_horizontally
-from kubr.config.job import Job
+from kubr.config.job import Job, JobType, JobBackend
 import humanize
 from tabulate import tabulate
+
 
 class RetryPolicy(str, Enum):
     """
@@ -70,18 +73,21 @@ RETRY_POLICIES: Mapping[str, Iterable[Mapping[str, str]]] = {
 
 
 class VolcanoBackend(BaseBackend):
+    DEFAULT_TASK_NAME = "worker"
+
     def __init__(self):
         self.kubernetes_config = config.load_config()
         self.crd_client = client.CustomObjectsApi()
         self.core_client = client.CoreV1Api()
 
-    def run_job(self, run_config: RunnerConfig):
+    def run_job(self, run_config: RunnerConfig) -> Job:
         tasks = []
 
         for replica_id in range(run_config.resources.num_replicas):
             pod = create_pod_definition(
                 pod_name=run_config.experiment.name,
                 resource_config=run_config.resources,
+                init_container_config=run_config.init_container,
                 container_config=run_config.container,
                 data_config=run_config.data,
                 service_account=None,
@@ -99,16 +105,14 @@ class VolcanoBackend(BaseBackend):
 
             task: Dict[str, Any] = {
                 "replicas": 1,
-                "name": run_config.experiment.task_name,
+                "name": self.DEFAULT_TASK_NAME,
                 "template": pod,
             }
-            if run_config.experiment.task_max_retries > 0:
-                task["maxRetry"] = run_config.experiment.task_max_retries
+            if run_config.experiment.worker_max_retries > 0:
+                task["maxRetry"] = run_config.experiment.worker_max_retries
                 task["policies"] = RETRY_POLICIES[RetryPolicy.APPLICATION]
 
-            if run_config.experiment.min_replicas is not None:
-                # first min_replicas tasks are required, afterward optional
-                task["minAvailable"] = 1 if replica_id < run_config.experiment.min_replicas else 0
+            task["minAvailable"] = 1
 
             tasks.append(task)
 
@@ -123,8 +127,8 @@ class VolcanoBackend(BaseBackend):
                 "env": [],
             },
         }
-        if run_config.experiment.priority_class is not None:
-            job_spec["priorityClassName"] = run_config.experiment.priority_class
+        # if run_config.experiment.priority_class is not None:
+        #     job_spec["priorityClassName"] = run_config.experiment.priority_class
 
         resource: Dict[str, object] = {
             "apiVersion": "batch.volcano.sh/v1alpha1",
@@ -140,7 +144,16 @@ class VolcanoBackend(BaseBackend):
             plural="jobs",
             body=resource,
         )
-        print(resp)
+
+        job = Job(type=JobType.torchrun,
+                  backend=JobBackend.Volcano,
+                  name=run_config.experiment.name,
+                  namespace=run_config.experiment.namespace,
+                  state=JobState.Pending,
+                  age=datetime.now(),
+                  gpu=run_config.resources.gpu * run_config.resources.num_replicas
+                  )
+        return job
 
     def _completion_list_running_jobs(self, **kwargs):
         print("Using completion list for running jobs")
@@ -153,6 +166,16 @@ class VolcanoBackend(BaseBackend):
             if job['status']['state']['phase'] == 'Running':
                 running_jobs.append(job['metadata']['name'])
         return running_jobs
+
+    @staticmethod
+    def _extract_gpu_count(k8s_job) -> int:
+        gpu_count = 0
+
+        for task in k8s_job['spec']['tasks']:
+            for container in task['template']['spec']['containers']:
+                if 'nvidia.com/gpu' in container['resources']['limits']:
+                    gpu_count += int(container['resources']['limits']['nvidia.com/gpu'])
+        return gpu_count
 
     def list_jobs(self, namespace: str = 'All'):
         # TODO [ls] show used resources
@@ -167,18 +190,21 @@ class VolcanoBackend(BaseBackend):
         for k8s_job in k8s_jobs:
             if namespace != 'All' and k8s_job['metadata']['namespace'] != namespace:
                 continue
-            job = Job(type='Volcano',
+
+            job = Job(type=JobType.torchrun,
+                      backend=JobBackend.Volcano,
                       name=k8s_job['metadata']['name'],
                       namespace=k8s_job['metadata']['namespace'],
                       state=k8s_job['status']['state']['phase'],
                       age=datetime.strptime(k8s_job['status']['state']['lastTransitionTime'],
-                                            '%Y-%m-%dT%H:%M:%SZ')
+                                            '%Y-%m-%dT%H:%M:%SZ'),
+                      gpu=self._extract_gpu_count(k8s_job)
                       )
             extracted_jobs.append(job)
 
         return extracted_jobs
 
-    def delete_job(self, job_name: str, namespace: str):
+    def delete_job(self, job_name: str, namespace: str) -> DeleteStatus:
         # TODO add cli response formatting for deletion confirmation
         resp = self.crd_client.delete_namespaced_custom_object(group='batch.volcano.sh',
                                                                version='v1alpha1',
@@ -190,7 +216,7 @@ class VolcanoBackend(BaseBackend):
         for event in events.items:
             self.core_client.delete_namespaced_event(name=event.metadata.name, namespace=namespace)
 
-        print(resp)
+        return DeleteStatus.Success
 
     def get_job_main_pod(self, job_name: str, namespace: str):
         pods = self.core_client.list_namespaced_pod(namespace=namespace,
