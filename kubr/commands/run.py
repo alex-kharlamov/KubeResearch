@@ -4,9 +4,11 @@ from typing import Optional
 import humanize
 from tabulate import tabulate
 
+from kubr.backends.base import JobOperationStatus
 from kubr.backends.volcano import VolcanoBackend
 from kubr.commands.base import BaseCommand
-from kubr.commands.utils.drawing import generate_jobs_table
+from kubr.commands.utils.drawing import generate_jobs_table, mascot_message
+from kubr.config.job import JobState
 from kubr.config.runner import RunnerConfig
 from pydantic_yaml import parse_yaml_raw_as
 from rich import print
@@ -14,7 +16,7 @@ from rich import print
 
 def visualize_job(job):
     job.age = humanize.naturaldelta(datetime.utcnow() - job.age)
-    print(generate_jobs_table([job], title=str(JobState,Pending)))
+    print(generate_jobs_table([job], state=str(JobState.Pending)))
 
 
 class RunCommand(BaseCommand):
@@ -43,6 +45,12 @@ class RunCommand(BaseCommand):
         config.container.entrypoint = entrypoint or config.container.entrypoint
         config.experiment.namespace = namespace or config.experiment.namespace
 
-        job = self.backend.run_job(config)
-        visualize_job(job)
+        job, status = self.backend.run_job(config)
+        if status == JobOperationStatus.Failed:
+            print(mascot_message(f"Job {config.experiment.name} running failed!"))
+
+        elif status == JobOperationStatus.Success:
+            visualize_job(job)
+        else:
+            print(mascot_message(f"Job {config.experiment.name} is in unknown state!"))
 

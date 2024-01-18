@@ -28,11 +28,12 @@ from kubr.backends.k8s_runner import (
 )
 from kubr.config.runner import RunnerConfig
 from kubr.config.job import JobType, JobBackend, JobState
-from kubr.backends.base import BaseBackend, DeleteStatus
+from kubr.backends.base import BaseBackend, JobOperationStatus
 from kubr.backends.utils import join_tables_horizontally
 from kubr.config.job import Job, JobType, JobBackend
 import humanize
 from tabulate import tabulate
+from rich import print
 
 
 class RetryPolicy(str, Enum):
@@ -80,7 +81,7 @@ class VolcanoBackend(BaseBackend):
         self.crd_client = client.CustomObjectsApi()
         self.core_client = client.CoreV1Api()
 
-    def run_job(self, run_config: RunnerConfig) -> Job:
+    def run_job(self, run_config: RunnerConfig) -> [Job, JobOperationStatus]:
         tasks = []
 
         for replica_id in range(run_config.resources.num_replicas):
@@ -137,13 +138,18 @@ class VolcanoBackend(BaseBackend):
             "spec": job_spec,
         }
 
-        resp = self.crd_client.create_namespaced_custom_object(
-            group="batch.volcano.sh",
-            version="v1alpha1",
-            namespace=run_config.experiment.namespace,
-            plural="jobs",
-            body=resource,
-        )
+        try:
+            resp = self.crd_client.create_namespaced_custom_object(
+                group="batch.volcano.sh",
+                version="v1alpha1",
+                namespace=run_config.experiment.namespace,
+                plural="jobs",
+                body=resource,
+            )
+        except Exception as e:
+            # TODO [run] add exception printing
+            print(e)
+            return None, JobOperationStatus.Failed
 
         job = Job(type=JobType.torchrun,
                   backend=JobBackend.Volcano,
@@ -153,7 +159,7 @@ class VolcanoBackend(BaseBackend):
                   age=datetime.now(),
                   gpu=run_config.resources.gpu * run_config.resources.num_replicas
                   )
-        return job
+        return job, JobOperationStatus.Success
 
     def _completion_list_running_jobs(self, **kwargs):
         print("Using completion list for running jobs")
@@ -204,7 +210,7 @@ class VolcanoBackend(BaseBackend):
 
         return extracted_jobs
 
-    def delete_job(self, job_name: str, namespace: str) -> DeleteStatus:
+    def delete_job(self, job_name: str, namespace: str) -> JobOperationStatus:
         # TODO add cli response formatting for deletion confirmation
         resp = self.crd_client.delete_namespaced_custom_object(group='batch.volcano.sh',
                                                                version='v1alpha1',
@@ -216,7 +222,7 @@ class VolcanoBackend(BaseBackend):
         for event in events.items:
             self.core_client.delete_namespaced_event(name=event.metadata.name, namespace=namespace)
 
-        return DeleteStatus.Success
+        return JobOperationStatus.Success
 
     def get_job_main_pod(self, job_name: str, namespace: str):
         pods = self.core_client.list_namespaced_pod(namespace=namespace,

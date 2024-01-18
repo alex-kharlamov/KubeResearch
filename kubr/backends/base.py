@@ -6,7 +6,7 @@ class PrettyEnum(Enum):
         return str(self.value)
 
 
-class DeleteStatus(PrettyEnum):
+class JobOperationStatus(PrettyEnum):
     """DeleteStatus is the status of the job deletion.
 
     Args:

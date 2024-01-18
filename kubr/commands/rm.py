@@ -1,6 +1,6 @@
 from enum import Enum
 
-from kubr.backends.base import DeleteStatus
+from kubr.backends.base import JobOperationStatus
 from kubr.commands.base import BaseCommand
 from kubr.commands.utils.drawing import mascot_message
 from rich import print
@@ -24,5 +24,5 @@ class RmCommand(BaseCommand):
             print(mascot_message(f"Job {job_name} deletion failed!"))
             return
 
-        if status == DeleteStatus.Success:
+        if status == JobOperationStatus.Success:
             print(mascot_message(f"Job {job_name} was deleted successfully!"))
