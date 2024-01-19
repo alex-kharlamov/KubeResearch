@@ -50,3 +50,4 @@ class Job(BaseModel):
     state: JobState
     age: Union[datetime.datetime, str]
     gpu: int
+    nodes: int = 1

@@ -38,7 +38,7 @@ class VolcanoBackend(BaseBackend):
     def run_job(self, run_config: RunnerConfig) -> [Job, JobOperationStatus]:
         tasks = []
 
-        for replica_id in range(run_config.resources.num_replicas):
+        for replica_id in range(run_config.resources.nodes):
             pod = create_pod_definition(
                 pod_name=run_config.experiment.name,
                 resource_config=run_config.resources,
@@ -60,7 +60,7 @@ class VolcanoBackend(BaseBackend):
 
             task: Dict[str, Any] = {
                 "replicas": 1,
-                "name": self.DEFAULT_TASK_NAME,
+                "name": f"{self.DEFAULT_TASK_NAME}-{replica_id}",
                 "template": pod,
             }
             if run_config.experiment.worker_max_retries > 0:
@@ -113,7 +113,7 @@ class VolcanoBackend(BaseBackend):
             namespace=run_config.experiment.namespace,
             state=JobState.Pending,
             age=datetime.now(),
-            gpu=run_config.resources.gpu * run_config.resources.num_replicas,
+            gpu=run_config.resources.gpu * run_config.resources.nodes,
         )
         return job, JobOperationStatus.Success
 

@@ -34,9 +34,8 @@ class RunCommand(BaseCommand):
         run_parser.add_argument("--name", help="Name of job")
         run_parser.add_argument("-v", "--verbose", help="Verbose output", action="store_true", default=False)
 
-    def show_job_run(self, job: Job, main_pod_name: str):
-        run_states_names = ["Job Scheduling", "Pods Creation"]
-        run_state = 0
+    def show_job_run(self, job: Job):
+        node_update_step = 100 / job.nodes
         console = Console()
 
         w = watch.Watch()
@@ -47,9 +46,7 @@ class RunCommand(BaseCommand):
         autoscaler = []
 
         progress = Progress()
-
-        status = console.status(run_states_names[run_state])
-        # status.start()
+        status = console.status("Running job...")
 
         live_panel = Live(Panel(Group(status, progress)))
         live_panel.start()
@@ -57,6 +54,8 @@ class RunCommand(BaseCommand):
         scheduling_pb = progress.add_task("[red]Scheduling...", total=100)
         init_pb = progress.add_task("[green]Init...", total=100)
         container_pb = progress.add_task("[cyan]Container...", total=100)
+
+        run_state = "Scheduling"
 
         # involvedObject.name={job.name}*,
         for line in stream:
@@ -67,25 +66,21 @@ class RunCommand(BaseCommand):
                 autoscaler.append(event_object)
                 continue
 
-            if event_object.involved_object.kind == "PodGroup":
-                pass
-            elif event_object.involved_object.kind == "Pod":
-                run_state = 1
-
-            # print(event_object.message)
-
             if event_object.message.startswith("Successfully assigned"):
-                progress.update(scheduling_pb, advance=100)
+                progress.update(scheduling_pb, advance=node_update_step)
+                if progress.tasks[scheduling_pb].completed:
+                    run_state = "Init"
 
             if event_object.message == f"Started container {job.name}-init":
-                progress.update(init_pb, advance=75)
+                progress.update(init_pb, advance=node_update_step)
+                if progress.tasks[scheduling_pb].completed:
+                    run_state = "Container"
 
             if event_object.message == f"Started container {job.name}":
-                progress.update(init_pb, advance=100)
-                progress.update(container_pb, advance=75)
+                progress.update(container_pb, advance=75 / job.nodes)
                 break
 
-            status.update(f"{run_states_names[run_state]}: {event_object.message}")
+            status.update(f"{run_state}... {event_object.message}")
 
         while True:
             sleep(2)
@@ -125,8 +120,7 @@ class RunCommand(BaseCommand):
 
         elif status == JobOperationStatus.Success:
             if verbose:
-                # pod_name, pod = self.backend.get_job_main_pod(job.name, job.namespace)
-                self.show_job_run(job, "")
+                self.show_job_run(job)
             else:
                 visualize_job(job)
         else:

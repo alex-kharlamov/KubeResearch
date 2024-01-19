@@ -85,7 +85,7 @@ class ResourceConfig(BaseModel):
     """ResourceConfig is the configuration for the resources.
 
     Args:
-        num_replicas (int, optional): Number of replicas to run. Defaults to 1.
+        nodes (int, optional): Number of replicas to run. Defaults to 1.
         cpu (int, optional): Number of CPUs to request. Defaults to 0.
         memory (int, optional): Memory in GB to request. Defaults to 0.
         gpu (int, optional): Number of GPUs to request. Defaults to 0.
@@ -94,7 +94,7 @@ class ResourceConfig(BaseModel):
     """
 
     # TODO [config][resources] add taints\tolerations\affinity
-    num_replicas: int = pydantic.Field(gt=0, type=int, default=1)
+    nodes: int = pydantic.Field(gt=0, type=int, default=1)
     cpu: int = 0
     memory: float = 0
     gpu: int = 0
