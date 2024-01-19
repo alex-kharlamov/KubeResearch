@@ -100,6 +100,7 @@ class VolcanoBackend(BaseBackend):
                 plural="jobs",
                 body=resource,
             )
+
         except Exception as e:
             # TODO [run] add exception printing
             print(e)
@@ -170,11 +171,10 @@ class VolcanoBackend(BaseBackend):
         self.crd_client.delete_namespaced_custom_object(
             group="batch.volcano.sh", version="v1alpha1", namespace=namespace, plural="jobs", name=job_name
         )
-        events = self.core_client.list_namespaced_event(
-            namespace=namespace, field_selector=f"involvedObject.name={job_name}"
-        )
+        events = self.core_client.list_namespaced_event(namespace=namespace)
         for event in events.items:
-            self.core_client.delete_namespaced_event(name=event.metadata.name, namespace=namespace)
+            if event.metadata.name.startswith(f"{job_name}"):
+                self.core_client.delete_namespaced_event(name=event.metadata.name, namespace=namespace)
 
         return JobOperationStatus.Success
 

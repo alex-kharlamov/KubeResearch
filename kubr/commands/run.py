@@ -1,14 +1,20 @@
 from datetime import datetime
+from time import sleep
 from typing import Optional
 
 import humanize
+from kubernetes import watch
 from pydantic_yaml import parse_yaml_raw_as
 from rich import print
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress
 
 from kubr.backends.base import JobOperationStatus
 from kubr.commands.base import BaseCommand
 from kubr.commands.utils.drawing import generate_jobs_table, mascot_message
-from kubr.config.job import JobState
+from kubr.config.job import Job, JobState
 from kubr.config.runner import RunnerConfig
 
 
@@ -26,9 +32,72 @@ class RunCommand(BaseCommand):
         run_parser.add_argument("-e", "--entrypoint", help="Entrypoint to run")
         run_parser.add_argument("-n", "--namespace", help="Namespace to submit job to")
         run_parser.add_argument("--name", help="Name of job")
-        run_parser.add_argument(
-            "-it", "--interactive", help="Run job interactively", action="store_true", default=False
+        run_parser.add_argument("-v", "--verbose", help="Verbose output", action="store_true", default=False)
+
+    def show_job_run(self, job: Job, main_pod_name: str):
+        run_states_names = ["Job Scheduling", "Pods Creation"]
+        run_state = 0
+        console = Console()
+
+        w = watch.Watch()
+        stream = w.stream(
+            self.backend.core_client.list_namespaced_event,
+            namespace=job.namespace,
         )
+        autoscaler = []
+
+        progress = Progress()
+
+        status = console.status(run_states_names[run_state])
+        # status.start()
+
+        live_panel = Live(Panel(Group(status, progress)))
+        live_panel.start()
+
+        scheduling_pb = progress.add_task("[red]Scheduling...", total=100)
+        init_pb = progress.add_task("[green]Init...", total=100)
+        container_pb = progress.add_task("[cyan]Container...", total=100)
+
+        # involvedObject.name={job.name}*,
+        for line in stream:
+            event_object = line["object"]
+            if not event_object.metadata.name.startswith(job.name):
+                continue
+            if event_object.source.component == "cluster-autoscaler":
+                autoscaler.append(event_object)
+                continue
+
+            if event_object.involved_object.kind == "PodGroup":
+                pass
+            elif event_object.involved_object.kind == "Pod":
+                run_state = 1
+
+            # print(event_object.message)
+
+            if event_object.message.startswith("Successfully assigned"):
+                progress.update(scheduling_pb, advance=100)
+
+            if event_object.message == f"Started container {job.name}-init":
+                progress.update(init_pb, advance=75)
+
+            if event_object.message == f"Started container {job.name}":
+                progress.update(init_pb, advance=100)
+                progress.update(container_pb, advance=75)
+                break
+
+            status.update(f"{run_states_names[run_state]}: {event_object.message}")
+
+        while True:
+            sleep(2)
+            try:
+                log_stream = self.backend.get_logs(job_name=job.name, namespace=job.namespace, tail=None, follow=True)
+                for log in log_stream:
+                    progress.update(container_pb, advance=25)
+                    status.update("Job started!")
+                    live_panel.stop()
+                    print(log)
+            except Exception:
+                status.update("Container starting...")
 
     def __call__(
         self,
@@ -37,6 +106,7 @@ class RunCommand(BaseCommand):
         name: Optional[str] = None,
         entrypoint: Optional[str] = None,
         namespace: Optional[str] = None,
+        verbose: bool = False,
     ):
         # TODO [run] check if config exists on cluster and ask to resubmit
 
@@ -54,6 +124,10 @@ class RunCommand(BaseCommand):
             print(mascot_message(f"Job {config.experiment.name} running failed!"))
 
         elif status == JobOperationStatus.Success:
-            visualize_job(job)
+            if verbose:
+                # pod_name, pod = self.backend.get_job_main_pod(job.name, job.namespace)
+                self.show_job_run(job, "")
+            else:
+                visualize_job(job)
         else:
             print(mascot_message(f"Job {config.experiment.name} is in unknown state!"))

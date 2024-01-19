@@ -38,7 +38,12 @@ def main():
     if args.command == "run":
         operator = RunCommand()
         operator(
-            config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace, name=args.name
+            config=args.config,
+            image=args.image,
+            entrypoint=args.entrypoint,
+            namespace=args.namespace,
+            name=args.name,
+            verbose=args.verbose,
         )
     elif args.command == "ls":
         operator = LsCommand()
