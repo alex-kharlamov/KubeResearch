@@ -5,6 +5,9 @@ line-length = 120
 profile = "black"
 line_length = 120
 
+[tool.flake8]
+max-line-length = 120
+
 [build-system]
 requires = ["setuptools", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
@@ -27,7 +30,8 @@ dependencies = [
     "pydantic-yaml==1.2.0",
     "cowsay==6.1",
     "rich==13.7.0",
-    "pytest==7.4.4"
+    "pytest==7.4.4",
+    "pre-commit==3.6.0"
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -59,4 +63,3 @@ include-package-data = true
 [tool.setuptools.packages.find]
 include = ["kubr"]
 exclude = ["charts", "venv", ]
-
