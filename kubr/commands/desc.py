@@ -1,3 +1,5 @@
+from rich import print
+
 from kubr.commands.base import BaseCommand
 
 
@@ -10,4 +12,5 @@ class DescribeCommand(BaseCommand):
         return desc_parser
 
     def __call__(self, *args, **kwargs):
-        return self.backend.describe_job(*args, **kwargs)
+        result = self.backend.describe_job(*args, **kwargs)
+        print(result)

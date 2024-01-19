@@ -48,6 +48,7 @@ def visualize_jobs(jobs: List[Job], head: Optional[int] = 10, show_all: bool = F
     return Columns(
         result,
         equal=True,
+        align="center",
     )
 
 

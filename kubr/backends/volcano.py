@@ -195,7 +195,7 @@ class VolcanoBackend(BaseBackend):
         )
         return events
 
-    def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None):
+    def get_logs(self, job_name: str, namespace: str, tail: Optional[int] = None, follow: bool = False):
         pod_name, pod = self.get_job_main_pod(job_name, namespace)
         containers = pod.spec.containers
         if len(containers) == 0:
@@ -204,17 +204,14 @@ class VolcanoBackend(BaseBackend):
         container = containers[0]
         container_name = container.name
         if tail:
-            api_response = self.core_client.read_namespaced_pod_log(
+            return self.core_client.read_namespaced_pod_log(
                 name=pod_name, namespace=namespace, container=container_name, tail_lines=tail
             )
-            return api_response
-        else:
+        if follow:
             w = watch.Watch()
-            # TODO fix log streaming utf-8 decoding
-            for line in w.stream(
+            return w.stream(
                 self.core_client.read_namespaced_pod_log, name=pod_name, namespace=namespace, container=container_name
-            ):
-                print(line)
+            )
 
         api_response = self.core_client.read_namespaced_pod_log(name=pod_name, namespace=namespace)
         return api_response

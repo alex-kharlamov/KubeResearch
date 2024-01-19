@@ -51,7 +51,7 @@ def main():
         operator(job_name=args.job_name, namespace=args.namespace)
     elif args.command == "logs":
         operator = LogsCommand()
-        operator(job_name=args.job, namespace=args.namespace, tail=args.tail)
+        operator(job_name=args.job, namespace=args.namespace, tail=args.tail, follow=args.follow)
     elif args.command == "attach":
         raise NotImplementedError  # TODO implement attach command
     elif args.command == "stat":
