@@ -1,8 +1,7 @@
-from enum import Enum
+import datetime
+from typing import Union
 
 from pydantic import BaseModel
-import datetime
-from typing import Literal, Union
 
 from kubr.backends.base import PrettyEnum
 
@@ -13,6 +12,7 @@ class JobType(PrettyEnum):
     Args:
         torchrun (str): Run a torchrun job.
     """
+
     torchrun = "torchrun"
 
 
@@ -22,6 +22,7 @@ class JobBackend(PrettyEnum):
     Args:
         Volcano (str): Run a Volcano job.
     """
+
     Volcano = "Volcano"
 
 
@@ -34,6 +35,7 @@ class JobState(PrettyEnum):
         Completed (str): Job is completed.
         Failed (str): Job has failed.
     """
+
     Pending = "Pending"
     Running = "Running"
     Completed = "Completed"

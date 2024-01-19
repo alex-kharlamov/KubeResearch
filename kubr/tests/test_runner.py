@@ -1,8 +1,9 @@
 import pytest
-from kubr.config.runner import RunnerConfig, ExperimentConfig, ResourceConfig
 from pydantic_yaml import parse_yaml_raw_as
-from kubr.backends.volcano import VolcanoBackend
+
 from kubr.backends.base import BaseBackend
+from kubr.backends.volcano import VolcanoBackend
+from kubr.config.runner import ExperimentConfig, RunnerConfig
 
 base_config = """
 container:
@@ -28,17 +29,19 @@ class TestRunner:
     def test_run(self, backend: BaseBackend, runner: RunnerConfig):
         backend.run_job(runner)
 
-    @pytest.mark.parametrize("name, namespace, queue",
-                             [("pytest-test", "default", "default"),
-                              pytest.param("pytest-test", "default", "test", marks=pytest.mark.xfail),
-                              pytest.param("pytest-test", "test", "default", marks=pytest.mark.xfail),
-                              pytest.param("pytest-test", "test", "test", marks=pytest.mark.xfail)
-                              ])
-    def test_experiment_base(self, backend: BaseBackend, runner: RunnerConfig,
-                             name: str, namespace: str, queue: str, env: dict):
+    @pytest.mark.parametrize(
+        "name, namespace, queue",
+        [
+            ("pytest-test", "default", "default"),
+            pytest.param("pytest-test", "default", "test", marks=pytest.mark.xfail),
+            pytest.param("pytest-test", "test", "default", marks=pytest.mark.xfail),
+            pytest.param("pytest-test", "test", "test", marks=pytest.mark.xfail),
+        ],
+    )
+    def test_experiment_base(
+        self, backend: BaseBackend, runner: RunnerConfig, name: str, namespace: str, queue: str, env: dict
+    ):
         experiment_config = ExperimentConfig(name=name, namespace=namespace, queue=queue)
         runner.experiment = experiment_config
 
         backend.run_job(runner)
-
-

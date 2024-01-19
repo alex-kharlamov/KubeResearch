@@ -1,16 +1,18 @@
+from typing import List
+
 import cowsay
 from rich.table import Table
-from typing import List
+
 from kubr.config.job import Job, JobState
 
-mascot = r'''
+mascot = r"""
 \
  \
   ╱|、
-(˚ˎ 。7  
- |、˜〵          
+(˚ˎ 。7
+ |、˜〵
 じしˍ,)ノ
-'''
+"""
 
 
 def mascot_message(msg: str):

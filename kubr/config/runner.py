@@ -1,12 +1,9 @@
-from dataclasses import field
-from enum import Enum
-from typing import Dict, List, Literal, Union
-from typing import Optional
+from typing import List, Literal, Optional, Union
 
 import pydantic
 from pydantic import BaseModel
 
-from kubr.config.job import JobType, JobBackend
+from kubr.config.job import JobBackend, JobType
 
 
 class SecretMount(BaseModel):
@@ -15,6 +12,7 @@ class SecretMount(BaseModel):
     secret_name: str
     secret_key: str
 
+
 class EnvVar(BaseModel):
     """EnvVar is the configuration for an environment variable.
 
@@ -22,12 +20,13 @@ class EnvVar(BaseModel):
         name (str): Name of the environment variable.
         value (str): Value of the environment variable.
     """
+
     name: str
     value: str
 
 
 class ContainerConfig(BaseModel):
-    """ ContainerConfig is the configuration for the container.
+    """ContainerConfig is the configuration for the container.
 
     Args:
         image (str): Image to run.
@@ -35,6 +34,7 @@ class ContainerConfig(BaseModel):
         env (Dict[str, str], optional): Environment variables to pass to the entrypoint. Defaults to {}.
         secrets (Optional[List[SecretConfig]], optional): Secrets to pass to the entrypoint. Defaults to None.
     """
+
     image: str
     entrypoint: Optional[str] = None
     env: List[EnvVar] = []
@@ -58,6 +58,7 @@ class VolumeMount(BaseModel):
         type (Literal["hostPath"]): Type of the volume.
         mount_path (str): Mount path of the volume.
     """
+
     name: str
     type: Literal["hostPath"]
     mount_path: str
@@ -75,6 +76,7 @@ class DataConfig(BaseModel):
     Args:
         volumes (Optional[List[VolumeMount]], optional): List of volumes to mount. Defaults to [].
     """
+
     # pvcs: Optional[List[str]] = None
     volumes: Optional[List[VolumeMount]] = []
 
@@ -90,6 +92,7 @@ class ResourceConfig(BaseModel):
         ib (Union[int, Literal['auto']], optional): Number of Infiniband devices to request. Defaults to 0.
         ib_device (str, optional): Name of the Infiniband device to request. Defaults to "nvidia.com/hostdev".
     """
+
     # TODO [config][resources] add taints\tolerations\affinity
     num_replicas: int = pydantic.Field(gt=0, type=int, default=1)
     cpu: int = 0
@@ -97,7 +100,7 @@ class ResourceConfig(BaseModel):
     gpu: int = 0
     # devices: Dict[str, float] = field(default_factory=dict)
     # capabilities: Dict[str, str] = field(default_factory=dict)
-    ib: Union[int, Literal['auto']] = 0
+    ib: Union[int, Literal["auto"]] = 0
     ib_device: str = "nvidia.com/hostdev"
 
 
@@ -111,6 +114,7 @@ class ExperimentConfig(BaseModel):
         job_retries (int, optional): Number of retries for the job. Defaults to 0.
         worker_max_retries (int, optional): Maximum number of retries for the task. Defaults to 10.
     """
+
     name: str
     namespace: str
 
@@ -123,6 +127,7 @@ class ExperimentConfig(BaseModel):
     # TODO add tests for retries
     job_retries: int = 0
     worker_max_retries: int = 0
+
 
 class RunnerConfig(BaseModel):
     """RunnerConfig is the configuration for the runner.
@@ -137,6 +142,7 @@ class RunnerConfig(BaseModel):
         data (Optional[DataConfig], optional): Data configuration. Defaults to None.
 
     """
+
     experiment: ExperimentConfig
     init_container: Optional[ContainerConfig] = None
     container: ContainerConfig

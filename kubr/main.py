@@ -1,6 +1,7 @@
 # PYTHON_ARGCOMPLETE_OK
-import argcomplete
 import argparse
+
+import argcomplete
 
 from kubr.backends.volcano import VolcanoBackend
 from kubr.commands.desc import DescribeCommand
@@ -17,15 +18,15 @@ def main():
     # TODO fix Volcano priority class in GKE (https://github.com/volcano-sh/volcano/issues/2379)
 
     backend = VolcanoBackend()
-    arg = argparse.ArgumentParser(description='Kubr', add_help=True)
-    arg.add_argument('--version', help='Get version of Kubr')
-    subparsers = arg.add_subparsers(help='Commands', dest='command')
+    arg = argparse.ArgumentParser(description="Kubr", add_help=True)
+    arg.add_argument("--version", help="Get version of Kubr")
+    subparsers = arg.add_subparsers(help="Commands", dest="command")
 
-    run_parser = RunCommand.add_parser(subparsers)
-    ls_parser = LsCommand.add_parser(subparsers)
-    rm_parser = RmCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
-    desc_parser = DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
-    logs_parser = LogsCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    RunCommand.add_parser(subparsers)
+    LsCommand.add_parser(subparsers)
+    RmCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
+    LogsCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
 
     # attach_parser = AttachCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     # stat_parser = StatCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
@@ -34,31 +35,32 @@ def main():
     argcomplete.autocomplete(arg)
     args = arg.parse_args()
 
-    if args.command == 'run':
+    if args.command == "run":
         operator = RunCommand()
-        operator(config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace,
-                 name=args.name)
-    elif args.command == 'ls':
+        operator(
+            config=args.config, image=args.image, entrypoint=args.entrypoint, namespace=args.namespace, name=args.name
+        )
+    elif args.command == "ls":
         operator = LsCommand()
         operator(namespace=args.namespace, show_all=args.all, head=args.top)
-    elif args.command == 'rm':
+    elif args.command == "rm":
         operator = RmCommand()
         operator(job_name=args.job, namespace=args.namespace)
-    elif args.command == 'desc':
+    elif args.command == "desc":
         operator = DescribeCommand()
         operator(job_name=args.job_name, namespace=args.namespace)
-    elif args.command == 'logs':
+    elif args.command == "logs":
         operator = LogsCommand()
         operator(job_name=args.job, namespace=args.namespace, tail=args.tail)
-    elif args.command == 'attach':
+    elif args.command == "attach":
         raise NotImplementedError  # TODO implement attach command
-    elif args.command == 'stat':
+    elif args.command == "stat":
         raise NotImplementedError  # TODO implement stat command
-    elif args.command == 'test':
+    elif args.command == "test":
         raise NotImplementedError  # TODO implement test command -- run IB\scheduler\metrics\registry\ethernet tests
     else:
         arg.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,14 +1,8 @@
-from dataclasses import dataclass, field
-from typing import Dict, List, Literal
-from typing import Optional
+from typing import Dict, Optional
 
-from kubernetes.client import V1HostPathVolumeSource, V1EnvVarSource, V1SecretKeySelector
-
-from kubr.config.runner import ContainerConfig, ResourceConfig, DataConfig
-
+from kubernetes.client import V1EnvVarSource, V1HostPathVolumeSource, V1SecretKeySelector
 from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1Container,
-    V1ContainerPort,
     V1EmptyDirVolumeSource,
     V1EnvVar,
     V1ObjectMeta,
@@ -20,14 +14,22 @@ from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1VolumeMount,
 )
 
+from kubr.config.runner import ContainerConfig, DataConfig, ResourceConfig
+
 RESERVED_MILLICPU = 100
 RESERVED_MEMMB = 1024
 
 ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
 
 
-def create_pod_definition(pod_name: str, resource_config: ResourceConfig, container_config: ContainerConfig,
-                          service_account: Optional[str], data_config: DataConfig, init_container_config: ContainerConfig) -> "V1Pod":
+def create_pod_definition(
+    pod_name: str,
+    resource_config: ResourceConfig,
+    container_config: ContainerConfig,
+    service_account: Optional[str],
+    data_config: DataConfig,
+    init_container_config: ContainerConfig,
+) -> "V1Pod":
     limits = {}
     requests = {}
 
@@ -80,7 +82,7 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
                         name=volume.name,
                         host_path=V1HostPathVolumeSource(
                             path=host_path,
-                        )
+                        ),
                     )
                 )
                 volume_mounts.append(
@@ -95,20 +97,24 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
 
     container_envs = []
     for env in container_config.env:
-        container_envs.append(V1EnvVar(
-            name=env.name,
-            value=env.value,
-        ))
+        container_envs.append(
+            V1EnvVar(
+                name=env.name,
+                value=env.value,
+            )
+        )
     for secret in container_config.secrets:
-        container_envs.append(V1EnvVar(
-            name=secret.env,
-            value_from=V1EnvVarSource(
-                secret_key_ref=V1SecretKeySelector(
-                    name=secret.secret_name,
-                    key=secret.secret_key,
+        container_envs.append(
+            V1EnvVar(
+                name=secret.env,
+                value_from=V1EnvVarSource(
+                    secret_key_ref=V1SecretKeySelector(
+                        name=secret.secret_name,
+                        key=secret.secret_key,
+                    ),
                 ),
-            ),
-        ))
+            )
+        )
 
     # port_maps = [
     #     V1ContainerPort(
@@ -121,11 +127,16 @@ def create_pod_definition(pod_name: str, resource_config: ResourceConfig, contai
     init_containers = []
     if init_container_config is not None:
         # TODO [run] support env handling for init_container
-        init_containers.append(V1Container(command=init_container_config.entrypoint.split() if init_container_config.entrypoint is not None else None,
-                                           image=init_container_config.image,
-                                           image_pull_policy="Always",
-                                           name=f"{pod_name}-init",
-                                           ))
+        init_containers.append(
+            V1Container(
+                command=init_container_config.entrypoint.split()
+                if init_container_config.entrypoint is not None
+                else None,
+                image=init_container_config.image,
+                image_pull_policy="Always",
+                name=f"{pod_name}-init",
+            )
+        )
 
     container = V1Container(
         command=container_config.entrypoint.split() if container_config.entrypoint is not None else None,

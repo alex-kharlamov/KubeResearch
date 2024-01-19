@@ -13,6 +13,7 @@ class JobOperationStatus(PrettyEnum):
         Success (str): Job was deleted successfully.
         Failed (str): Job deletion failed.
     """
+
     Success = "Success"
     Failed = "Failed"
 
