@@ -13,7 +13,7 @@ from rich.progress import Progress
 
 from kubr.backends.base import JobOperationStatus
 from kubr.commands.base import BaseCommand
-from kubr.commands.utils.drawing import generate_jobs_table, mascot_message
+from kubr.commands.utils.reply import confirmation_prompt, generate_jobs_table, mascot_message
 from kubr.config.job import Job, JobState
 from kubr.config.runner import RunnerConfig
 
@@ -57,6 +57,9 @@ class RunCommand(BaseCommand):
 
         run_state = "Scheduling"
 
+        pod_events = []
+        started_containers = 0
+
         # involvedObject.name={job.name}*,
         for line in stream:
             event_object = line["object"]
@@ -65,6 +68,9 @@ class RunCommand(BaseCommand):
             if event_object.source.component == "cluster-autoscaler":
                 autoscaler.append(event_object)
                 continue
+
+            if event_object.reason == "FailedScheduling":
+                pod_events.append(event_object)
 
             if event_object.message.startswith("Successfully assigned"):
                 progress.update(scheduling_pb, advance=node_update_step)
@@ -77,22 +83,33 @@ class RunCommand(BaseCommand):
                     run_state = "Container"
 
             if event_object.message == f"Started container {job.name}":
-                progress.update(container_pb, advance=75 / job.nodes)
-                break
+                progress.update(container_pb, advance=node_update_step)
+                started_containers += 1
+                if started_containers == job.nodes:
+                    status.update("Waiting for logs...")
+                    break
 
-            status.update(f"{run_state}... {event_object.message}")
+            if "pod group is not ready" in event_object.message and len(pod_events):
+                status.update(f"{run_state}... {event_object.message}\n \t Pod issue: {pod_events[-1].message}")
+            else:
+                status.update(f"{run_state}... {event_object.message}")
 
+        log_found = 0
         while True:
             sleep(2)
             try:
                 log_stream = self.backend.get_logs(job_name=job.name, namespace=job.namespace, tail=None, follow=True)
                 for log in log_stream:
-                    progress.update(container_pb, advance=25)
-                    status.update("Job started!")
-                    live_panel.stop()
+                    # TODO [run] stop if log stopped
+                    if not log_found:
+                        status.update("Job started!")
+                        live_panel.stop()
                     print(log)
+                    log_found += 1
+
+                break
             except Exception:
-                status.update("Container starting...")
+                status.update("Waiting for logs...")
 
     def __call__(
         self,
@@ -113,6 +130,20 @@ class RunCommand(BaseCommand):
         config.container.image = image or config.container.image
         config.container.entrypoint = entrypoint or config.container.entrypoint
         config.experiment.namespace = namespace or config.experiment.namespace
+
+        if "-" in config.experiment.name:
+            print(mascot_message(f"Job name {config.experiment.name} is invalid!"))
+            return
+
+        pods = self.backend.core_client.list_namespaced_pod(
+            namespace=config.experiment.namespace, label_selector=f"volcano.sh/job-name={config.experiment.name}"
+        )
+        if len(pods.items) > 0:
+            if confirmation_prompt(
+                f"Job {config.experiment.name} already exists in namespace {config.experiment.namespace}. \n"
+                f"Do you want to resubmit it?"
+            ):
+                self.backend.delete_job(job_name=config.experiment.name, namespace=config.experiment.namespace)
 
         job, status = self.backend.run_job(config)
         if status == JobOperationStatus.Failed:

@@ -1,6 +1,7 @@
 from typing import List
 
 import cowsay
+from rich import print
 from rich.table import Table
 
 from kubr.config.job import Job, JobState
@@ -31,3 +32,9 @@ def generate_jobs_table(jobs: List[Job], state: str):
     for job in jobs:
         table.add_row(job.name, job.namespace, job.age, str(job.gpu))
     return table
+
+
+def confirmation_prompt(msg: str):
+    print(mascot_message(msg + "\n |y/N| Default=No"))
+    response = input().lower()
+    return response in ["y", "yes"]

@@ -1,8 +1,10 @@
+import pydoc
 from typing import Optional
 
 from rich import print
 
 from kubr.backends.volcano import VolcanoBackend
+from kubr.commands.utils.reply import mascot_message
 
 
 class LogsCommand:
@@ -19,10 +21,15 @@ class LogsCommand:
         return logs_parser
 
     def __call__(self, job_name: str, namespace: str, tail: Optional[int] = None, follow: bool = False):
-        logs = self.backend.get_logs(job_name=job_name, namespace=namespace, tail=tail, follow=follow)
+        try:
+            logs = self.backend.get_logs(job_name=job_name, namespace=namespace, tail=tail, follow=follow)
+        except Exception as e:
+            print(e)
+            print(mascot_message(f"Job {job_name} logs retrieval failed!"))
+            return
         if follow:
             # TODO [logs][follow] add pretty Ctrl+C handling
             for log in logs:
                 print(log)
         else:
-            print(logs)
+            pydoc.pager(logs)

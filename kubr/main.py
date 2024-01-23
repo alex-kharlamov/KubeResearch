@@ -4,7 +4,6 @@ import argparse
 import argcomplete
 
 from kubr.backends.volcano import VolcanoBackend
-from kubr.commands.desc import DescribeCommand
 from kubr.commands.logs import LogsCommand
 from kubr.commands.ls import LsCommand
 from kubr.commands.rm import RmCommand
@@ -25,9 +24,9 @@ def main():
     RunCommand.add_parser(subparsers)
     LsCommand.add_parser(subparsers)
     RmCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
-    DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     LogsCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
 
+    # DescribeCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     # attach_parser = AttachCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     # stat_parser = StatCommand.add_parser(subparsers, completer=backend._completion_list_running_jobs)
     # test_parser = TestCommand.add_parser(subparsers)
@@ -51,9 +50,9 @@ def main():
     elif args.command == "rm":
         operator = RmCommand()
         operator(job_name=args.job, namespace=args.namespace)
-    elif args.command == "desc":
-        operator = DescribeCommand()
-        operator(job_name=args.job_name, namespace=args.namespace)
+    # elif args.command == "desc":
+    #     operator = DescribeCommand()
+    #     operator(job_name=args.job_name, namespace=args.namespace)
     elif args.command == "logs":
         operator = LogsCommand()
         operator(job_name=args.job, namespace=args.namespace, tail=args.tail, follow=args.follow)

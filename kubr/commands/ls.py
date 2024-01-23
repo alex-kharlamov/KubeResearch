@@ -7,7 +7,7 @@ from rich import print
 from rich.columns import Columns
 
 from kubr.commands.base import BaseCommand
-from kubr.commands.utils.drawing import generate_jobs_table, mascot_message
+from kubr.commands.utils.reply import generate_jobs_table, mascot_message
 from kubr.config.job import Job, JobState
 
 

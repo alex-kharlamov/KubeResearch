@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Iterable, Mapping, Optional
@@ -10,7 +11,20 @@ from tabulate import tabulate
 from kubr.backends.base import BaseBackend, JobOperationStatus
 from kubr.backends.k8s_runner import create_pod_definition
 from kubr.config.job import Job, JobBackend, JobState, JobType
-from kubr.config.runner import RunnerConfig
+from kubr.config.runner import EnvVar, RunnerConfig
+
+
+def normalize_str(data: str) -> str:
+    """
+    Invokes ``lower`` on thes string and removes all
+    characters that do not satisfy ``[a-z0-9\\-]`` pattern.
+    This method is mostly used to make sure kubernetes and gcp_batch scheduler gets
+    the job name that does not violate its restrictions.
+    """
+    if data.startswith("-"):
+        data = data[1:]
+    pattern = r"[a-z0-9\-]"
+    return "".join(re.findall(pattern, data.lower()))
 
 
 class RetryPolicy(str, Enum):
@@ -39,13 +53,16 @@ class VolcanoBackend(BaseBackend):
         tasks = []
 
         for replica_id in range(run_config.resources.nodes):
+            rank0_env = f"VC_{normalize_str(self.DEFAULT_TASK_NAME)}_0_HOSTS".upper()
+            if replica_id == 0:
+                rank0_env = "KUBR_RANK0_HOST"
+                run_config.container.env.append(EnvVar(name="KUBR_RANK0_HOST", value="localhost"))
+
             pod = create_pod_definition(
                 pod_name=run_config.experiment.name,
-                resource_config=run_config.resources,
-                init_container_config=run_config.init_container,
-                container_config=run_config.container,
-                data_config=run_config.data,
+                runner_config=run_config,
                 service_account=None,
+                rank0_env=rank0_env,
             )
 
             # pod.metadata.labels.update(
@@ -114,6 +131,7 @@ class VolcanoBackend(BaseBackend):
             state=JobState.Pending,
             age=datetime.now(),
             gpu=run_config.resources.gpu * run_config.resources.nodes,
+            nodes=run_config.resources.nodes,
         )
         return job, JobOperationStatus.Success
 
@@ -140,9 +158,7 @@ class VolcanoBackend(BaseBackend):
         return gpu_count
 
     def list_jobs(self, namespace: str = "All"):
-        # TODO [ls] show used resources
         # TODO [ls] speedup for selected namespace(filter on server side)
-        # TODO [ls] show events for pending jobs
         jobs_stat = self.crd_client.list_cluster_custom_object(
             group="batch.volcano.sh", version="v1alpha1", plural="jobs"
         )

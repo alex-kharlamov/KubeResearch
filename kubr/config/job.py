@@ -14,6 +14,7 @@ class JobType(PrettyEnum):
     """
 
     torchrun = "torchrun"
+    basic = "basic"
 
 
 class JobBackend(PrettyEnum):

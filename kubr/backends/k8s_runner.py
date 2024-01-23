@@ -1,6 +1,7 @@
-from typing import Dict, Optional
+import shlex
+from typing import Dict, Iterable, Optional
 
-from kubernetes.client import V1EnvVarSource, V1HostPathVolumeSource, V1SecretKeySelector
+from kubernetes.client import V1ContainerPort, V1EnvVarSource, V1HostPathVolumeSource, V1SecretKeySelector
 from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1Container,
     V1EmptyDirVolumeSource,
@@ -14,7 +15,8 @@ from kubernetes.client.models import (  # noqa: F811 redefinition of unused
     V1VolumeMount,
 )
 
-from kubr.config.runner import ContainerConfig, DataConfig, ResourceConfig
+from kubr.config.job import JobType
+from kubr.config.runner import ContainerConfig, DataConfig, ResourceConfig, RunnerConfig
 
 RESERVED_MILLICPU = 100
 RESERVED_MEMMB = 1024
@@ -22,14 +24,32 @@ RESERVED_MEMMB = 1024
 ANNOTATION_ISTIO_SIDECAR = "sidecar.istio.io/inject"
 
 
+class _noquote(str):
+    pass
+
+
+def _args_join(args: Iterable[str]) -> str:
+    """
+    _args_join is like shlex.join but if the argument is wrapped in _noquote
+    it'll not quote that argument.
+    """
+    quoted = [arg if isinstance(arg, _noquote) else shlex.quote(arg) for arg in args]
+    return " ".join(quoted)
+
+
 def create_pod_definition(
     pod_name: str,
-    resource_config: ResourceConfig,
-    container_config: ContainerConfig,
+    runner_config: RunnerConfig,
     service_account: Optional[str],
-    data_config: DataConfig,
-    init_container_config: ContainerConfig,
+    rank0_env: str,
 ) -> "V1Pod":
+    resource_config: ResourceConfig = runner_config.resources
+    container_config: ContainerConfig = runner_config.container
+    data_config: Optional[DataConfig] = runner_config.data
+    init_container_config: Optional[ContainerConfig] = runner_config.init_container
+
+    rdzv_port: int = 29500
+
     limits = {}
     requests = {}
 
@@ -59,8 +79,6 @@ def create_pod_definition(
     # if LABEL_INSTANCE_TYPE in resource.capabilities:
     #     node_selector[LABEL_INSTANCE_TYPE] = resource.capabilities[LABEL_INSTANCE_TYPE]
 
-    # To support PyTorch dataloaders we need to set /dev/shm to larger than the
-    # 64M default so we mount an unlimited sized tmpfs directory on it.
     SHM_VOL = "dshm"
     volumes = [
         V1Volume(
@@ -124,6 +142,13 @@ def create_pod_definition(
     #     for name, port in container_config.port_map.items()
     # ]
     port_maps = []
+    if runner_config.type == JobType.torchrun:
+        port_maps.append(
+            V1ContainerPort(
+                name="c10d",
+                container_port=rdzv_port,
+            )
+        )
     init_containers = []
     if init_container_config is not None:
         # TODO [run] support env handling for init_container
@@ -137,9 +162,47 @@ def create_pod_definition(
                 name=f"{pod_name}-init",
             )
         )
+    cmd = []
+
+    if runner_config.type == JobType.torchrun:
+        rdzv_backend = "c10d"
+        # rank0_env = "${rank0_env}"
+        if runner_config.resources.nodes > 1:
+            rdzv_endpoint = _noquote(f"$${{{rank0_env}:=localhost}}:{rdzv_port}")
+        else:
+            rdzv_endpoint = "localhost:0"
+
+        cmd = [
+            "torchrun",
+            "--rdzv_backend",
+            rdzv_backend,
+            "--rdzv_endpoint",
+            rdzv_endpoint,
+            "--rdzv_id",
+            f"{runner_config.experiment.name}",
+            "--rdzv_conf",
+            "read_timeout=600",
+            "--nnodes",
+            str(runner_config.resources.nodes),
+            "--nproc_per_node",
+            str(runner_config.resources.gpu),
+            "--tee",
+            "3",
+            "--role",
+            "",
+        ]
+    elif runner_config.type == JobType.basic:
+        cmd = []
+    else:
+        raise ValueError(f"Unknown job type {runner_config.type}")
+
+    cmd += container_config.entrypoint.split() if container_config.entrypoint is not None else []
+
+    if runner_config.type == JobType.torchrun:
+        cmd = ["bash", "-c", _args_join(cmd)]
 
     container = V1Container(
-        command=container_config.entrypoint.split() if container_config.entrypoint is not None else None,
+        command=cmd,
         image=container_config.image,
         image_pull_policy="Always",
         name=pod_name,
